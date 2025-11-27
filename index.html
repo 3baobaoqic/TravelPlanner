@@ -2,17 +2,19 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Good Travel Plan - 旅遊規劃 App</title>
+    <meta name="description" content="多人協作旅遊規劃 App">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Babel for JSX transformation -->
+    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Global Styles for Scrollbar Hiding -->
+    <!-- Global Styles -->
     <style>
+        /* Hide Scrollbar but allow scrolling */
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -24,10 +26,32 @@
             background-color: #f3f4f6;
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
         }
+        /* Loading Spinner Styles */
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #F0FFF4;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #0ABAB5;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 
-    <!-- Import Map for Modules -->
+    <!-- Import Map: 定義模組來源 -->
     <script type="importmap">
     {
         "imports": {
@@ -43,8 +67,28 @@
         }
     }
     </script>
+
+    <!-- Global Error Handler for Debugging on Mobile/GitHub Pages -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            // 忽略 ResizeObserver 錯誤 (通常不影響功能)
+            if (message.includes('ResizeObserver')) return;
+            console.error(error);
+            // 若嚴重錯誤導致白畫面，顯示提示
+            const root = document.getElementById('root');
+            if (!root || root.innerHTML.trim() === '') {
+                alert('App 載入發生錯誤：\n' + message);
+            }
+        };
+    </script>
 </head>
 <body>
+    <!-- Loading Screen (會被 React 替換) -->
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <p style="margin-top: 16px; color: #00695C; font-weight: bold;">旅程準備中...</p>
+    </div>
+
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
@@ -116,8 +160,7 @@
         let isConfigured = false;
 
         try {
-            // 檢查是否已填入設定 (簡單檢查 apiKey 是否已替換)
-            // 在預覽環境中，我們會優先使用 __firebase_config
+            // 優先檢查環境變數 (預覽用)，其次檢查使用者設定
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                  const configToUse = JSON.parse(__firebase_config);
                  app = initializeApp(configToUse);
@@ -142,12 +185,10 @@
 
         // --- Gemini API Helper ---
         const callGemini = async (prompt, systemInstruction) => {
-            const apiKey = ""; // 注意：在前端直接呼叫 API key 有風險，建議僅在受信任環境使用或透過後端轉接
-            // 如果您有 Gemini API Key，請填入上方引號中
+            const apiKey = ""; // 若有 Gemini API Key 可填入，否則 AI 功能將無效
             
             if (!apiKey) {
-                // alert("請在程式碼中設定 Gemini API Key 以使用 AI 功能。");
-                // Silent fail or handle gracefully
+                // alert("請設定 API Key 以使用 AI 功能");
                 return null;
             }
 
