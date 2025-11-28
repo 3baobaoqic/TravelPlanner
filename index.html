@@ -89,7 +89,7 @@
             Navigation, PieChart, ArrowLeft, Wallet, User, Menu, History, LogOut, Edit2, 
             Check, CloudSun, Thermometer, PlaneTakeoff, PlaneLanding, ArrowRightLeft, Timer, 
             BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera,
-            Filter, Search, AlertCircle
+            Filter, Search, AlertCircle, Info
         } from 'lucide-react';
 
         // ============================================================================
@@ -108,16 +108,15 @@
           measurementId: "G-JWWRP5LX7F"
         };
 
-        const appId = 'my-travel-planner'; // 修正變數名稱：改為小寫 appId 以匹配下方使用
+        const appId = 'my-travel-planner';
 
         // ============================================================================
 
         let app, auth, db;
         let configValid = false;
 
-        // 嚴格檢查 Firebase 設定
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "") {
-            console.warn("Firebase config missing. Collaborative features disabled.");
+            console.warn("Firebase config missing.");
             configValid = false;
         } else {
             try {
@@ -271,13 +270,97 @@
 
         // --- Sub-Components ---
 
-        const ExpenseModal = ({ isOpen, onClose, tripData, onSave, onUpdateCategories, selectedDate }) => {
+        // Lightbox Component for viewing images
+        const ImageModal = ({ src, onClose }) => {
+            if (!src) return null;
+            return (
+                <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
+                    <button className="absolute top-4 right-4 text-white p-2 rounded-full bg-black/20 hover:bg-white/20 transition">
+                        <X size={24} />
+                    </button>
+                    <img src={src} className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+                </div>
+            );
+        };
+
+        // Transaction Detail Modal
+        const TransactionDetailModal = ({ transaction, onClose, onViewImage }) => {
+            if (!transaction) return null;
+            
+            const categoryColor = CATEGORY_COLORS[transaction.category] || '#9CA3AF';
+
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+                    <div className="absolute inset-0 bg-black/40 pointer-events-auto" onClick={onClose}></div>
+                    <div className="bg-white w-[85%] max-w-sm rounded-2xl p-5 shadow-2xl transform transition-all pointer-events-auto relative">
+                        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+                            <X size={20} />
+                        </button>
+                        
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-2 h-8 rounded-full" style={{ backgroundColor: categoryColor }}></div>
+                            <h3 className="text-xl font-bold text-gray-800">{transaction.title || '未命名消費'}</h3>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-baseline border-b border-gray-100 pb-2">
+                                <span className="text-sm text-gray-500">金額</span>
+                                <span className="text-2xl font-bold text-[#D68C68]">{transaction.cost} <span className="text-sm font-normal text-gray-400">{transaction.currency}</span></span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-gray-400 block mb-1">分類</label>
+                                    <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColor }}></span>
+                                        {transaction.category}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 block mb-1">付款人</label>
+                                    <div className="text-sm font-medium text-gray-700">{transaction.payer}</div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 block mb-1">時間</label>
+                                    <div className="text-sm font-medium text-gray-700">{transaction.time || '--:--'}</div>
+                                </div>
+                            </div>
+
+                            {transaction.note && (
+                                <div className="bg-gray-50 p-3 rounded-xl text-sm text-gray-600">
+                                    {transaction.note}
+                                </div>
+                            )}
+
+                            {transaction.photoUrls && transaction.photoUrls.length > 0 && (
+                                <div>
+                                    <label className="text-xs text-gray-400 block mb-2">照片 / 收據</label>
+                                    <div className="flex gap-2 overflow-x-auto pb-2">
+                                        {transaction.photoUrls.map((url, i) => (
+                                            <img 
+                                                key={i} 
+                                                src={url} 
+                                                className="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-zoom-in" 
+                                                onClick={() => onViewImage(url)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ExpenseModal = ({ isOpen, onClose, tripData, onSave, onUpdateCategories, selectedDate, onViewImage }) => {
             const [formData, setFormData] = useState({});
             const [isManageCategories, setIsManageCategories] = useState(false);
             const [newCategory, setNewCategory] = useState('');
             const fileInputRef = useRef(null);
             const currentCategories = tripData.expenseCategories || DEFAULT_EXPENSE_CATEGORIES;
             
+            // Add Expense Date State
             const [expenseDate, setExpenseDate] = useState('');
 
             useEffect(() => {
@@ -307,8 +390,13 @@
 
             const handlePhotoUpload = (e) => {
                 if (e.target.files && e.target.files[0]) {
-                    const mockUrl = `https://placehold.co/100x100/D68C68/ffffff?text=Receipt`;
-                    setFormData(prev => ({ ...prev, photoUrls: [...(prev.photoUrls || []), mockUrl] }));
+                    const file = e.target.files[0];
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64String = reader.result;
+                        setFormData(prev => ({ ...prev, photoUrls: [...(prev.photoUrls || []), base64String] }));
+                    };
+                    reader.readAsDataURL(file);
                 }
             };
 
@@ -464,7 +552,11 @@
                                     <div className="flex items-center gap-2">
                                         {formData.photoUrls && formData.photoUrls.length > 0 ? (
                                              <div className="relative w-10 h-10 flex-shrink-0">
-                                                <img src={formData.photoUrls[0]} className="w-full h-full object-cover rounded-lg border border-gray-200" />
+                                                <img 
+                                                    src={formData.photoUrls[0]} 
+                                                    className="w-full h-full object-cover rounded-lg border border-gray-200 cursor-zoom-in" 
+                                                    onClick={() => onViewImage(formData.photoUrls[0])}
+                                                />
                                                 <button onClick={() => handleLocalPhotoDelete(0)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"><X size={8} /></button>
                                             </div>
                                         ) : (
@@ -485,6 +577,7 @@
                                 onClick={() => { 
                                     const costVal = parseFloat(formData.cost);
                                     if(costVal > 0) {
+                                        // Pass date along with data
                                         onSave({...formData, cost: costVal, transport: 'expense'}, expenseDate); 
                                     }
                                 }} 
@@ -744,7 +837,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200/60" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -774,6 +867,9 @@
             const [selectedDate, setSelectedDate] = useState('');
             const [showGemini, setShowGemini] = useState(false);
             const [showExpenseModal, setShowExpenseModal] = useState(false);
+            const [showTransactionDetail, setShowTransactionDetail] = useState(null);
+            const [viewingImage, setViewingImage] = useState(null);
+
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             const [recentTrips, setRecentTrips] = useState([]);
             const [uploadTarget, setUploadTarget] = useState(null);
@@ -785,9 +881,6 @@
 
             // Date Filter for Expenses
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
-            
-            // Separate state for Home Screen Join ID Input
-            const [homeJoinInput, setHomeJoinInput] = useState('');
 
             useEffect(() => {
                 if(!configValid) return;
@@ -825,8 +918,6 @@
 
             useEffect(() => {
                 if (!user || !tripId || !configValid) return;
-                // Only start snapshot listener when we have a valid tripId (not while typing)
-                
                 return onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -842,7 +933,7 @@
                         });
                     }
                 });
-            }, [user, tripId]); // Only re-run when tripId officially changes (via button click)
+            }, [user, tripId]);
 
             const handleStartPlanning = async () => {
                 if (!configValid) { alert("Firebase not configured."); return; }
@@ -1299,7 +1390,11 @@
                                                             </div>
                                                             <div className="space-y-2">
                                                                 {items.map(e => (
-                                                                    <div key={e.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg shadow-sm border border-gray-100">
+                                                                    <div 
+                                                                        key={e.id} 
+                                                                        onClick={() => setShowTransactionDetail(e)}
+                                                                        className="flex justify-between items-center bg-white p-2.5 rounded-lg shadow-sm border border-gray-100 active:scale-[0.99] transition-transform cursor-pointer"
+                                                                    >
                                                                         <div className="flex flex-col">
                                                                             <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
                                                                             <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
@@ -1343,6 +1438,14 @@
                             </div>
                             
                             <ExpenseModal isOpen={showExpenseModal} onClose={() => setShowExpenseModal(false)} tripData={tripData} onSave={(d, date) => addActivity('expense', d, date)} onUpdateCategories={updateTripCategories} selectedDate={selectedDate} />
+                            
+                            {/* Lightbox and Detail Modals */}
+                            <ImageModal src={viewingImage} onClose={() => setViewingImage(null)} />
+                            <TransactionDetailModal 
+                                transaction={showTransactionDetail} 
+                                onClose={() => setShowTransactionDetail(null)} 
+                                onViewImage={setViewingImage}
+                            />
                             
                             <input type="file" ref={inputRef} onChange={(e) => e.target.files && handlePhotoUpload(e.target.files[0])} className="hidden" accept="image/*" />
                             {showGemini && <GeminiAssistant tripData={tripData} selectedDate={selectedDate} updateItinerary={updateItinerary} close={() => setShowGemini(false)} />}
