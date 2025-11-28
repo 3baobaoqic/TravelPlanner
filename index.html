@@ -108,7 +108,7 @@
           measurementId: "G-JWWRP5LX7F"
         };
 
-        const APP_ID = 'my-travel-planner'; // 常數 APP_ID
+        const appId = 'my-travel-planner';
 
         // ============================================================================
 
@@ -117,7 +117,7 @@
 
         // 嚴格檢查 Firebase 設定
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "") {
-            console.warn("Firebase config missing.");
+            console.warn("Firebase config missing. Collaborative features disabled.");
             configValid = false;
         } else {
             try {
@@ -278,7 +278,6 @@
             const fileInputRef = useRef(null);
             const currentCategories = tripData.expenseCategories || DEFAULT_EXPENSE_CATEGORIES;
             
-            // Add Expense Date State
             const [expenseDate, setExpenseDate] = useState('');
 
             useEffect(() => {
@@ -746,7 +745,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200/60" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -832,7 +831,6 @@
                         if (view === 'home') { setView('planner'); setSelectedDate(data.startDate); }
                         const newRecent = { id: data.id, destination: data.destination, dateRange: `${data.startDate.slice(5)} - ${data.endDate.slice(5)}`, lastVisited: Date.now() };
                         setRecentTrips(prev => { 
-                            // Remove existing trip if present to update it
                             const filtered = prev.filter(t => t.id !== data.id); 
                             const updated = [newRecent, ...filtered].slice(0, 5); 
                             localStorage.setItem('gtp_recent_trips', JSON.stringify(updated)); 
