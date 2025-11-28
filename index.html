@@ -43,7 +43,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #F0FAFA;
+            background-color: #F0FAFA; /* 全域統一底色 */
             margin: 0;
             padding: 0;
             overflow-x: hidden;
@@ -93,7 +93,7 @@
         } from 'lucide-react';
 
         // ============================================================================
-        // --- 設定區 (您提供的資訊已填入) ---
+        // --- 設定區 (請在此填入您的資訊) ---
         // ============================================================================
 
         const GEMINI_API_KEY = ""; 
@@ -108,14 +108,14 @@
           measurementId: "G-JWWRP5LX7F"
         };
 
-        const appId = 'my-travel-planner'; // 用於資料庫路徑的 ID，請勿更動
+        const APP_ID = 'my-travel-planner'; // 常數 APP_ID
 
         // ============================================================================
 
         let app, auth, db;
         let configValid = false;
 
-        // 檢查 Firebase 設定
+        // 嚴格檢查 Firebase 設定
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "") {
             console.warn("Firebase config missing.");
             configValid = false;
@@ -278,6 +278,7 @@
             const fileInputRef = useRef(null);
             const currentCategories = tripData.expenseCategories || DEFAULT_EXPENSE_CATEGORIES;
             
+            // Add Expense Date State
             const [expenseDate, setExpenseDate] = useState('');
 
             useEffect(() => {
@@ -593,7 +594,7 @@
             );
         };
 
-        const Sidebar = ({ isOpen, onClose, onNavigate, recentTrips, tripData, updateTripMembers, currentTripId }) => {
+        const Sidebar = ({ isOpen, onClose, onNavigate, recentTrips, tripData, updateTripMembers, currentTripId, onDeleteTrip }) => {
             if (!isOpen) return null;
             
             const [joinIdInput, setJoinIdInput] = useState('');
@@ -649,10 +650,15 @@
                             <div className="space-y-2 pt-2 border-t border-gray-100">
                                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">近期瀏覽</h3>
                                 {recentTrips.length === 0 ? <p className="text-xs text-gray-400 italic pl-2">尚無紀錄</p> : recentTrips.map((t) => (
-                                    <button key={t.id} onClick={() => { onNavigate('planner', t.id); onClose(); }} className="w-full text-left p-3 rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-all">
-                                        <div className="font-bold text-gray-700 text-sm">{t.destination}</div>
-                                        <div className="text-xs text-gray-400">{t.dateRange}</div>
-                                    </button>
+                                    <div key={t.id} className="flex items-center gap-2">
+                                        <button onClick={() => { onNavigate('planner', t.id); onClose(); }} className="flex-1 text-left p-3 rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-all">
+                                            <div className="font-bold text-gray-700 text-sm">{t.destination}</div>
+                                            <div className="text-xs text-gray-400">{t.dateRange}</div>
+                                        </button>
+                                        <button onClick={(e) => onDeleteTrip(t.id, e)} className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50 transition-colors">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -740,7 +746,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200 border border-gray-200" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -826,6 +832,7 @@
                         if (view === 'home') { setView('planner'); setSelectedDate(data.startDate); }
                         const newRecent = { id: data.id, destination: data.destination, dateRange: `${data.startDate.slice(5)} - ${data.endDate.slice(5)}`, lastVisited: Date.now() };
                         setRecentTrips(prev => { 
+                            // Remove existing trip if present to update it
                             const filtered = prev.filter(t => t.id !== data.id); 
                             const updated = [newRecent, ...filtered].slice(0, 5); 
                             localStorage.setItem('gtp_recent_trips', JSON.stringify(updated)); 
@@ -858,6 +865,15 @@
                     alert("建立旅程失敗: " + e.message);
                 } finally {
                     setIsCreating(false);
+                }
+            };
+            
+            const handleDeleteTrip = (id, e) => {
+                e.stopPropagation(); // Prevent navigation
+                if(confirm('確定要刪除此旅程紀錄嗎？(不會刪除雲端資料)')) {
+                    const updated = recentTrips.filter(t => t.id !== id);
+                    setRecentTrips(updated);
+                    localStorage.setItem('gtp_recent_trips', JSON.stringify(updated));
                 }
             };
 
@@ -1095,6 +1111,9 @@
                         <div className="text-center max-w-md">
                             <h2 className="text-xl font-bold text-red-500 mb-2">設定錯誤</h2>
                             <p className="text-gray-600 mb-4">未偵測到有效的 Firebase 設定，無法啟用共同編輯功能。</p>
+                            <p className="text-xs text-gray-400 bg-gray-100 p-3 rounded text-left font-mono overflow-auto">
+                                請編輯 index.html 檔案，填入正確的 apiKey, authDomain, projectId 等資訊。
+                            </p>
                         </div>
                     </div>
                 );
@@ -1104,13 +1123,38 @@
 
             return (
                 <div className="w-full max-w-[480px] h-screen bg-[#F0FAFA] shadow-2xl flex flex-col overflow-hidden relative mx-auto">
-                    <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={(v, id) => { if(id) setTripId(id); setView(v); }} recentTrips={recentTrips} tripData={tripData} updateTripMembers={()=>{}} currentTripId={tripId} />
+                    <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={(v, id) => { if(id) setTripId(id); setView(v); }} recentTrips={recentTrips} tripData={tripData} updateTripMembers={()=>{}} currentTripId={tripId} onDeleteTrip={handleDeleteTrip} />
 
                     {view === 'home' && (
                         <div className="flex flex-col items-center justify-center h-full bg-[#F0FAFA] p-8">
                             <h1 className="text-3xl font-bold text-[#0ABAB5] mb-8">Travel Planner</h1>
                             <button onClick={() => setView('setup')} className="w-full py-4 bg-[#0ABAB5] text-white rounded-xl mb-4">建立新旅程</button>
-                            <div className="flex w-full gap-2"><input placeholder="旅程 ID" value={tripId} onChange={e => setTripId(e.target.value)} className="flex-1 border p-3 rounded-xl bg-slate-100 border-transparent" /><button onClick={() => tripId && setView('planner')} className="bg-gray-800 text-white px-6 rounded-xl">加入</button></div>
+                            <div className="flex w-full gap-2 mb-8"><input placeholder="旅程 ID" value={tripId} onChange={e => setTripId(e.target.value)} className="flex-1 border p-3 rounded-xl bg-slate-100 border-transparent" /><button onClick={() => tripId && setView('planner')} className="bg-gray-800 text-white px-6 rounded-xl">加入</button></div>
+                            
+                            {/* 我的旅程清單 */}
+                            <div className="w-full max-w-md mt-4">
+                                <h3 className="text-sm font-bold text-gray-500 mb-2 px-1">我的旅程</h3>
+                                {recentTrips.length === 0 ? (
+                                    <p className="text-gray-400 text-sm text-center py-4">尚無紀錄</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {recentTrips.map((t) => (
+                                            <div key={t.id} className="bg-white p-3 rounded-xl shadow-sm flex items-center justify-between group">
+                                                <div onClick={() => { setTripId(t.id); setView('planner'); }} className="flex-1 cursor-pointer">
+                                                    <div className="font-bold text-gray-800">{t.destination}</div>
+                                                    <div className="text-xs text-gray-400 flex gap-2">
+                                                        <span>{t.dateRange}</span>
+                                                        <span className="bg-gray-100 px-1 rounded text-[10px]">ID: {t.id}</span>
+                                                    </div>
+                                                </div>
+                                                <button onClick={(e) => handleDeleteTrip(t.id, e)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
