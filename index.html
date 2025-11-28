@@ -89,7 +89,7 @@
             Navigation, PieChart, ArrowLeft, Wallet, User, Menu, History, LogOut, Edit2, 
             Check, CloudSun, Thermometer, PlaneTakeoff, PlaneLanding, ArrowRightLeft, Timer, 
             BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera,
-            Filter
+            Filter, Search
         } from 'lucide-react';
 
         // ============================================================================
@@ -99,12 +99,12 @@
         const GEMINI_API_KEY = ""; 
 
         const firebaseConfig = {
-  apiKey: "AIzaSyAKTSFKT3IG7PkReQxURrTDRIasLfquTWo",
-  authDomain: "travelplannerapp-276cf.firebaseapp.com",
-  projectId: "travelplannerapp-276cf",
-  storageBucket: "travelplannerapp-276cf.firebasestorage.app",
-  messagingSenderId: "253131618834",
-  appId: "1:253131618834:web:54b669bf8fad3a88e276cb",
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
 
         const APP_ID = 'my-travel-planner';
@@ -114,18 +114,19 @@
         let app, auth, db;
         let isDemoMode = false;
 
-        try {
-            if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.apiKey !== "") {
+        // Strict check for demo mode to prevent loading hang
+        if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "") {
+            console.warn("Firebase config not set. Forcing DEMO MODE.");
+            isDemoMode = true;
+        } else {
+            try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
-            } else {
-                console.warn("Firebase config not set. App will run in offline demo mode.");
+            } catch (e) {
+                console.error("Firebase init error:", e);
                 isDemoMode = true;
             }
-        } catch (e) {
-            console.error("Firebase init error:", e);
-            isDemoMode = true;
         }
 
         const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -594,14 +595,66 @@
 
         const Sidebar = ({ isOpen, onClose, onNavigate, recentTrips, tripData, updateTripMembers, currentTripId }) => {
             if (!isOpen) return null;
+            
+            const [joinIdInput, setJoinIdInput] = useState('');
+
             return (
                 <div className="absolute inset-0 z-50 flex">
                     <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
                     <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-slide-in-left">
                         <div className="p-5 bg-[#0ABAB5] text-white flex justify-between items-center"><h2 className="font-bold text-lg">Good Travel Plan</h2><button onClick={onClose}><X size={24} /></button></div>
-                        <div className="p-4 space-y-4">
-                            <button onClick={() => { onNavigate('setup'); onClose(); }} className="w-full text-left p-2 hover:bg-gray-50 flex items-center gap-2"><Plus size={18} className="text-[#0ABAB5]" /> 建立新旅程</button>
-                            {recentTrips.map((t) => <button key={t.id} onClick={() => { onNavigate('planner', t.id); onClose(); }} className="w-full text-left p-2 border rounded bg-slate-100">{t.destination}</button>)}
+                        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
+                            
+                            {/* 功能選單 */}
+                            <div className="space-y-2">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">功能選單</h3>
+                                <button onClick={() => { onNavigate('setup'); onClose(); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium transition-colors"><Plus size={18} className="text-[#0ABAB5]" /> 建立新旅程</button>
+                                
+                                {/* 加入旅程區塊 */}
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                    <label className="text-xs text-gray-500 font-bold mb-1 block">輸入代碼加入旅程</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            value={joinIdInput}
+                                            onChange={(e) => setJoinIdInput(e.target.value)}
+                                            placeholder="旅程 ID" 
+                                            className="flex-1 p-2 text-xs border rounded outline-none focus:border-[#0ABAB5]"
+                                        />
+                                        <button 
+                                            onClick={() => { if(joinIdInput) { onNavigate('planner', joinIdInput); onClose(); setJoinIdInput(''); } }}
+                                            className="bg-[#0ABAB5] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#008985] transition-colors"
+                                        >
+                                            加入
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 當前旅程資訊 (如果有) */}
+                            {tripData && currentTripId && (
+                                <div className="space-y-2 pt-2 border-t border-gray-100">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">當前旅程設定</h3>
+                                    <div className="bg-[#E0F7FA]/50 p-3 rounded-lg border border-[#0ABAB5]/20">
+                                        <div className="text-sm font-bold text-gray-700 mb-1">{tripData.destination}</div>
+                                        <div className="text-xs text-gray-500 mb-2">{tripData.startDate} - {tripData.endDate}</div>
+                                        <div className="text-xs font-mono bg-white p-2 rounded border border-gray-200 text-center select-all text-gray-600">
+                                            ID: <span className="font-bold text-[#0ABAB5]">{currentTripId}</span>
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 text-center mt-1">分享此 ID 給旅伴即可加入</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 近期瀏覽 */}
+                            <div className="space-y-2 pt-2 border-t border-gray-100">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">近期瀏覽</h3>
+                                {recentTrips.length === 0 ? <p className="text-xs text-gray-400 italic pl-2">尚無紀錄</p> : recentTrips.map((t) => (
+                                    <button key={t.id} onClick={() => { onNavigate('planner', t.id); onClose(); }} className="w-full text-left p-3 rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-all">
+                                        <div className="font-bold text-gray-700 text-sm">{t.destination}</div>
+                                        <div className="text-xs text-gray-400">{t.dateRange}</div>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -625,7 +678,7 @@
                         </div>
                     </div>
                     <div className="px-2 pb-2 flex overflow-x-auto no-scrollbar space-x-2">
-                        {datesList.map((date, i) => {
+                        {datesList.map((date, index) => {
                             const isSelected = date === selectedDate;
                             const dayOfWeek = getDayOfWeek(date);
                             return ( 
@@ -638,7 +691,7 @@
                                         : 'bg-[#008985] text-white opacity-90 hover:opacity-100' 
                                     }`}
                                 >
-                                    <span className="text-[9px] opacity-80">D{i + 1}</span>
+                                    <span className="text-[9px] opacity-80">D{index + 1}</span>
                                     <span className="text-xs font-medium">{date.slice(5)}</span>
                                     <span className="text-[9px] opacity-90">{dayOfWeek}</span>
                                 </button> 
@@ -727,11 +780,24 @@
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
 
             useEffect(() => {
-                if(!auth) {
+                // 如果是 Demo Mode，直接設定假使用者
+                if(isDemoMode) {
                     setUser({ uid: 'demo-user', isAnonymous: true });
                     return;
                 }
-                signInAnonymously(auth).catch(console.error);
+                // 如果沒有 auth 物件 (可能初始化失敗)，也進 Demo Mode
+                if(!auth) {
+                    console.warn("Auth not initialized. Falling back to demo.");
+                    isDemoMode = true;
+                    setUser({ uid: 'demo-user', isAnonymous: true });
+                    return;
+                }
+                
+                signInAnonymously(auth).catch(err => {
+                    console.error("Auth failed:", err);
+                    isDemoMode = true;
+                    setUser({ uid: 'demo-user', isAnonymous: true });
+                });
                 return onAuthStateChanged(auth, setUser);
             }, []);
 
@@ -741,8 +807,11 @@
             }, []);
 
             useEffect(() => {
-                if (!user || !tripId || !db) {
-                    if(isDemoMode && tripId && !tripData) {
+                if (!user || !tripId) return;
+                
+                // 如果是 Demo Mode 或者沒有 db 連線，使用本地資料邏輯
+                if(isDemoMode || !db) {
+                    if(tripId && !tripData) {
                         const mockData = {
                             id: tripId,
                             destination: 'Demo Trip',
@@ -760,7 +829,8 @@
                         setSelectedDate(mockData.startDate);
                     }
                     return;
-                };
+                }
+
                 return onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -789,7 +859,7 @@
                     flights: { outbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' }, inbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' } }
                 };
 
-                if (db) {
+                if (!isDemoMode && db) {
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', newId), newData);
                 } else {
                     setTripData(newData);
@@ -800,26 +870,26 @@
             };
 
             const updateState = (newData) => {
-                setTripData({...tripData, ...newData});
+                setTripData(prev => ({...prev, ...newData}));
             }
 
             const updateItinerary = (newItinerary) => { 
-                if(db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { itinerary: newItinerary }); 
+                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { itinerary: newItinerary }); 
                 else updateState({ itinerary: newItinerary });
             };
             const updateTripMembers = (members) => { 
-                if(db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { members });
+                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { members });
                 else updateState({ members });
             };
             const updateTripCategories = (cats) => { 
-                if(db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { expenseCategories: cats }); 
+                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { expenseCategories: cats }); 
                 else updateState({ expenseCategories: cats });
             };
             
             const updateFlight = (type, field, val) => {
                  const flights = tripData.flights || { outbound: {}, inbound: {} };
                  const newFlights = { ...flights, [type]: { ...flights[type], [field]: val } };
-                 if(db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { flights: newFlights });
+                 if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { flights: newFlights });
                  else updateState({ flights: newFlights });
             };
 
@@ -842,7 +912,7 @@
                         curr.setDate(curr.getDate() + 1);
                     }
                 }
-                if(db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { accommodations: newAccoms });
+                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { accommodations: newAccoms });
                 else updateState({ accommodations: newAccoms });
             };
 
@@ -929,7 +999,7 @@
                 currentEnd.setDate(currentEnd.getDate() + 1); 
                 const newEndDate = currentEnd.toISOString().split('T')[0];
                 
-                if(db) {
+                if(!isDemoMode && db) {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { endDate: newEndDate, [`itinerary.${newEndDate}`]: [] });
                 } else {
                     const newItinerary = { ...tripData.itinerary, [newEndDate]: [] };
@@ -1022,7 +1092,7 @@
                 return [...acts].sort((a, b) => a.time.localeCompare(b.time));
             }, [tripData, selectedDate]);
 
-            if (!user) return <div className="flex h-screen items-center justify-center text-[#0ABAB5]">載入中...</div>;
+            if (!user) return <div className="flex h-screen items-center justify-center text-[#0ABAB5] font-bold animate-pulse">載入中...</div>;
 
             return (
                 <div className="w-full max-w-[480px] h-screen bg-[#F0FAFA] shadow-2xl flex flex-col overflow-hidden relative mx-auto">
@@ -1143,7 +1213,7 @@
                                         </div>
 
                                         {/* Transaction List (Moved to Top) */}
-                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
                                             {sortedExpensesByDate.length === 0 ? (
                                                 <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-xl">尚無消費紀錄</div>
                                             ) : (
@@ -1179,11 +1249,11 @@
                                         </div>
 
                                         {/* Charts (Below Transaction List) */}
-                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
                                             <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
                                             <SimplePieChart data={expenseData} />
                                         </div>
-                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
                                             <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
                                             <SimpleBarChart data={dailyExpenseData} />
                                         </div>
