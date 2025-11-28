@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Good Travel Plan</title>
+    <title>Good Travel Plan (Collaborative)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -89,7 +89,7 @@
             Navigation, PieChart, ArrowLeft, Wallet, User, Menu, History, LogOut, Edit2, 
             Check, CloudSun, Thermometer, PlaneTakeoff, PlaneLanding, ArrowRightLeft, Timer, 
             BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera,
-            Filter, Search
+            Filter, Search, AlertCircle
         } from 'lucide-react';
 
         // ============================================================================
@@ -99,12 +99,13 @@
         const GEMINI_API_KEY = ""; 
 
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+          apiKey: "AIzaSyAKTSFKT3IG7PkReQxURrTDRIasLfquTWo",
+          authDomain: "travelplannerapp-276cf.firebaseapp.com",
+          projectId: "travelplannerapp-276cf",
+          storageBucket: "travelplannerapp-276cf.firebasestorage.app",
+          messagingSenderId: "253131618834",
+          appId: "1:253131618834:web:54b669bf8fad3a88e276cb",
+          measurementId: "G-JWWRP5LX7F"
         };
 
         const APP_ID = 'my-travel-planner';
@@ -112,20 +113,21 @@
         // ============================================================================
 
         let app, auth, db;
-        let isDemoMode = false;
+        let configValid = false;
 
-        // Strict check for demo mode to prevent loading hang
+        // 嚴格檢查 Firebase 設定
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "") {
-            console.warn("Firebase config not set. Forcing DEMO MODE.");
-            isDemoMode = true;
+            console.warn("Firebase config missing. Collaborative features disabled.");
+            configValid = false;
         } else {
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                configValid = true;
             } catch (e) {
                 console.error("Firebase init error:", e);
-                isDemoMode = true;
+                configValid = false;
             }
         }
 
@@ -291,7 +293,6 @@
                         category: '餐飲',
                         photoUrls: []
                     });
-                    // Default date to currently selected date or today's date if within trip
                     setExpenseDate(selectedDate || tripData.startDate);
                     setIsManageCategories(false);
                 }
@@ -740,7 +741,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200/60" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -775,30 +776,26 @@
             const [uploadTarget, setUploadTarget] = useState(null);
             const inputRef = useRef(null);
             const [setupForm, setSetupForm] = useState({ destination: '', startDate: new Date().toISOString().split('T')[0], endDate: new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split('T')[0], currency: 'JPY' });
-            
+            const [authError, setAuthError] = useState(null);
+
             // Date Filter for Expenses
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
 
             useEffect(() => {
-                // 如果是 Demo Mode，直接設定假使用者
-                if(isDemoMode) {
-                    setUser({ uid: 'demo-user', isAnonymous: true });
-                    return;
-                }
-                // 如果沒有 auth 物件 (可能初始化失敗)，也進 Demo Mode
-                if(!auth) {
-                    console.warn("Auth not initialized. Falling back to demo.");
-                    isDemoMode = true;
-                    setUser({ uid: 'demo-user', isAnonymous: true });
-                    return;
-                }
-                
-                signInAnonymously(auth).catch(err => {
-                    console.error("Auth failed:", err);
-                    isDemoMode = true;
-                    setUser({ uid: 'demo-user', isAnonymous: true });
+                if(!configValid) return;
+
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser) {
+                        setUser(currentUser);
+                        setAuthError(null);
+                    } else {
+                        signInAnonymously(auth).catch((err) => {
+                            console.error("Auth failed:", err);
+                            setAuthError(err);
+                        });
+                    }
                 });
-                return onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
             }, []);
 
             useEffect(() => {
@@ -807,30 +804,7 @@
             }, []);
 
             useEffect(() => {
-                if (!user || !tripId) return;
-                
-                // 如果是 Demo Mode 或者沒有 db 連線，使用本地資料邏輯
-                if(isDemoMode || !db) {
-                    if(tripId && !tripData) {
-                        const mockData = {
-                            id: tripId,
-                            destination: 'Demo Trip',
-                            startDate: new Date().toISOString().split('T')[0],
-                            endDate: new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split('T')[0],
-                            currency: 'JPY',
-                            itinerary: {},
-                            members: defaultMembers,
-                            accommodations: {},
-                            flights: {}
-                        };
-                        const dates = getDatesArray(mockData.startDate, mockData.endDate);
-                        dates.forEach(d => { mockData.itinerary[d] = []; mockData.accommodations[d] = { name: '', bookingCode: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }; });
-                        setTripData(mockData);
-                        setSelectedDate(mockData.startDate);
-                    }
-                    return;
-                }
-
+                if (!user || !tripId || !configValid) return;
                 return onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -849,6 +823,7 @@
             }, [user, tripId]);
 
             const handleStartPlanning = async () => {
+                if (!configValid) { alert("Firebase not configured."); return; }
                 const newId = generateId();
                 const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
                 const itinerary = {}; dates.forEach(d => itinerary[d] = []);
@@ -859,38 +834,18 @@
                     flights: { outbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' }, inbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' } }
                 };
 
-                if (!isDemoMode && db) {
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', newId), newData);
-                } else {
-                    setTripData(newData);
-                    setSelectedDate(newData.startDate);
-                }
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', newId), newData);
                 setTripId(newId);
                 setView('planner');
             };
 
-            const updateState = (newData) => {
-                setTripData(prev => ({...prev, ...newData}));
-            }
-
-            const updateItinerary = (newItinerary) => { 
-                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { itinerary: newItinerary }); 
-                else updateState({ itinerary: newItinerary });
-            };
-            const updateTripMembers = (members) => { 
-                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { members });
-                else updateState({ members });
-            };
-            const updateTripCategories = (cats) => { 
-                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { expenseCategories: cats }); 
-                else updateState({ expenseCategories: cats });
-            };
+            const updateItinerary = (newItinerary) => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { itinerary: newItinerary });
+            const updateTripMembers = (members) => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { members });
+            const updateTripCategories = (cats) => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { expenseCategories: cats });
             
             const updateFlight = (type, field, val) => {
                  const flights = tripData.flights || { outbound: {}, inbound: {} };
-                 const newFlights = { ...flights, [type]: { ...flights[type], [field]: val } };
-                 if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { flights: newFlights });
-                 else updateState({ flights: newFlights });
+                 updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { flights: { ...flights, [type]: { ...flights[type], [field]: val } } });
             };
 
             const updateAccommodation = (date, field, val) => {
@@ -912,8 +867,7 @@
                         curr.setDate(curr.getDate() + 1);
                     }
                 }
-                if(!isDemoMode && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { accommodations: newAccoms });
-                else updateState({ accommodations: newAccoms });
+                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { accommodations: newAccoms });
             };
 
             const addActivity = (type, prefillData, targetDate) => {
@@ -999,13 +953,7 @@
                 currentEnd.setDate(currentEnd.getDate() + 1); 
                 const newEndDate = currentEnd.toISOString().split('T')[0];
                 
-                if(!isDemoMode && db) {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { endDate: newEndDate, [`itinerary.${newEndDate}`]: [] });
-                } else {
-                    const newItinerary = { ...tripData.itinerary, [newEndDate]: [] };
-                    const newAccoms = { ...tripData.accommodations, [newEndDate]: { name: '', bookingCode: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] } };
-                    updateState({ endDate: newEndDate, itinerary: newItinerary, accommodations: newAccoms });
-                }
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { endDate: newEndDate, [`itinerary.${newEndDate}`]: [] });
             };
 
             const openGoogleMaps = (title) => { const query = encodeURIComponent(title || tripData?.destination || ''); window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank'); };
@@ -1091,6 +1039,40 @@
                 const acts = tripData?.itinerary?.[selectedDate] || [];
                 return [...acts].sort((a, b) => a.time.localeCompare(b.time));
             }, [tripData, selectedDate]);
+
+            if (authError) {
+                return (
+                    <div className="flex h-screen items-center justify-center bg-red-50 p-8">
+                        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-md text-center">
+                             <h2 className="text-2xl font-bold text-red-500 mb-2">Firebase 連線錯誤</h2>
+                             <p className="text-gray-700 mb-4">無法完成驗證，請檢查以下設定：</p>
+                             <ul className="text-left text-sm text-gray-600 list-disc pl-5 space-y-2 mb-6">
+                                <li>請前往 Firebase Console > <strong>Authentication</strong>。</li>
+                                <li>點擊 <strong>Sign-in method</strong> 分頁。</li>
+                                <li>啟用 <strong>Anonymous (匿名)</strong> 登入提供者。</li>
+                             </ul>
+                             <div className="text-xs text-gray-400 break-all border p-2 rounded bg-gray-50 text-left">
+                                {authError.message || JSON.stringify(authError)}
+                             </div>
+                             <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">重試</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!configValid) {
+                return (
+                    <div className="flex h-screen items-center justify-center p-6 bg-white">
+                        <div className="text-center max-w-md">
+                            <h2 className="text-xl font-bold text-red-500 mb-2">設定錯誤</h2>
+                            <p className="text-gray-600 mb-4">未偵測到有效的 Firebase 設定，無法啟用共同編輯功能。</p>
+                            <p className="text-xs text-gray-400 bg-gray-100 p-3 rounded text-left font-mono overflow-auto">
+                                請編輯 index.html 檔案，填入正確的 apiKey, authDomain, projectId 等資訊。
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
 
             if (!user) return <div className="flex h-screen items-center justify-center text-[#0ABAB5] font-bold animate-pulse">載入中...</div>;
 
@@ -1213,7 +1195,7 @@
                                         </div>
 
                                         {/* Transaction List (Moved to Top) */}
-                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-slate-200 p-4 rounded-xl shadow-sm border border-gray-200">
                                             {sortedExpensesByDate.length === 0 ? (
                                                 <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-xl">尚無消費紀錄</div>
                                             ) : (
@@ -1249,11 +1231,11 @@
                                         </div>
 
                                         {/* Charts (Below Transaction List) */}
-                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-slate-200 p-4 rounded-xl shadow-sm border border-gray-200">
                                             <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
                                             <SimplePieChart data={expenseData} />
                                         </div>
-                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-slate-200 p-4 rounded-xl shadow-sm border border-gray-200">
                                             <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
                                             <SimpleBarChart data={dailyExpenseData} />
                                         </div>
