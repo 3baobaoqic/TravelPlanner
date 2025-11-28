@@ -89,7 +89,7 @@
             Navigation, PieChart, ArrowLeft, Wallet, User, Menu, History, LogOut, Edit2, 
             Check, CloudSun, Thermometer, PlaneTakeoff, PlaneLanding, ArrowRightLeft, Timer, 
             BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera,
-            Filter, Search, AlertCircle, Info
+            Filter, Search, AlertCircle
         } from 'lucide-react';
 
         // ============================================================================
@@ -108,7 +108,7 @@
           measurementId: "G-JWWRP5LX7F"
         };
 
-        const appId = 'my-travel-planner';
+        const appId = 'my-travel-planner'; // 修正變數名稱：改為小寫 appId 以匹配下方使用
 
         // ============================================================================
 
@@ -485,7 +485,6 @@
                                 onClick={() => { 
                                     const costVal = parseFloat(formData.cost);
                                     if(costVal > 0) {
-                                        // Pass date along with data
                                         onSave({...formData, cost: costVal, transport: 'expense'}, expenseDate); 
                                     }
                                 }} 
@@ -786,6 +785,9 @@
 
             // Date Filter for Expenses
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
+            
+            // Separate state for Home Screen Join ID Input
+            const [homeJoinInput, setHomeJoinInput] = useState('');
 
             useEffect(() => {
                 if(!configValid) return;
@@ -823,6 +825,8 @@
 
             useEffect(() => {
                 if (!user || !tripId || !configValid) return;
+                // Only start snapshot listener when we have a valid tripId (not while typing)
+                
                 return onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -838,7 +842,7 @@
                         });
                     }
                 });
-            }, [user, tripId]);
+            }, [user, tripId]); // Only re-run when tripId officially changes (via button click)
 
             const handleStartPlanning = async () => {
                 if (!configValid) { alert("Firebase not configured."); return; }
@@ -1127,7 +1131,20 @@
                         <div className="flex flex-col items-center justify-center h-full bg-[#F0FAFA] p-8">
                             <h1 className="text-3xl font-bold text-[#0ABAB5] mb-8">Travel Planner</h1>
                             <button onClick={() => setView('setup')} className="w-full py-4 bg-[#0ABAB5] text-white rounded-xl mb-4">建立新旅程</button>
-                            <div className="flex w-full gap-2 mb-8"><input placeholder="旅程 ID" value={tripId} onChange={e => setTripId(e.target.value)} className="flex-1 border p-3 rounded-xl bg-slate-100 border-transparent" /><button onClick={() => tripId && setView('planner')} className="bg-gray-800 text-white px-6 rounded-xl">加入</button></div>
+                            <div className="flex w-full gap-2 mb-8">
+                                <input 
+                                    placeholder="旅程 ID" 
+                                    value={homeJoinInput} 
+                                    onChange={e => setHomeJoinInput(e.target.value)} 
+                                    className="flex-1 border p-3 rounded-xl bg-slate-100 border-transparent" 
+                                />
+                                <button 
+                                    onClick={() => { if(homeJoinInput) { setTripId(homeJoinInput); setView('planner'); } }} 
+                                    className="bg-gray-800 text-white px-6 rounded-xl"
+                                >
+                                    加入
+                                </button>
+                            </div>
                             
                             {/* 我的旅程清單 */}
                             <div className="w-full max-w-md mt-4">
