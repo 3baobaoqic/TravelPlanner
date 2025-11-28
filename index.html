@@ -43,7 +43,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #F0FAFA; /* 全域統一底色 */
+            background-color: #F0FAFA;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
@@ -89,11 +89,11 @@
             Navigation, PieChart, ArrowLeft, Wallet, User, Menu, History, LogOut, Edit2, 
             Check, CloudSun, Thermometer, PlaneTakeoff, PlaneLanding, ArrowRightLeft, Timer, 
             BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera,
-            Filter, Search, AlertCircle
+            Filter, Search, AlertCircle, Info
         } from 'lucide-react';
 
         // ============================================================================
-        // --- 設定區 (請在此填入您的資訊) ---
+        // --- 設定區 (您提供的資訊已填入) ---
         // ============================================================================
 
         const GEMINI_API_KEY = ""; 
@@ -108,16 +108,16 @@
           measurementId: "G-JWWRP5LX7F"
         };
 
-        const appId = 'my-travel-planner';
+        const appId = 'my-travel-planner'; // 用於資料庫路徑的 ID，請勿更動
 
         // ============================================================================
 
         let app, auth, db;
         let configValid = false;
 
-        // 嚴格檢查 Firebase 設定
+        // 檢查 Firebase 設定
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "") {
-            console.warn("Firebase config missing. Collaborative features disabled.");
+            console.warn("Firebase config missing.");
             configValid = false;
         } else {
             try {
@@ -278,7 +278,6 @@
             const fileInputRef = useRef(null);
             const currentCategories = tripData.expenseCategories || DEFAULT_EXPENSE_CATEGORIES;
             
-            // Add Expense Date State
             const [expenseDate, setExpenseDate] = useState('');
 
             useEffect(() => {
@@ -741,7 +740,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200 border border-gray-200" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -778,6 +777,7 @@
             const [setupForm, setSetupForm] = useState({ destination: '', startDate: new Date().toISOString().split('T')[0], endDate: new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split('T')[0], currency: 'JPY' });
             const [authError, setAuthError] = useState(null);
             const [isCreating, setIsCreating] = useState(false); // Loading state for creation
+            const [connectionTimeout, setConnectionTimeout] = useState(false); // Track initial connection timeout
 
             // Date Filter for Expenses
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
@@ -785,18 +785,30 @@
             useEffect(() => {
                 if(!configValid) return;
 
+                // Set a timeout to show error if connection takes too long
+                const timer = setTimeout(() => {
+                    if (!user) {
+                        setConnectionTimeout(true);
+                    }
+                }, 5000); // 5 seconds timeout
+
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     if (currentUser) {
                         setUser(currentUser);
                         setAuthError(null);
+                        clearTimeout(timer); // Clear timeout on success
                     } else {
                         signInAnonymously(auth).catch((err) => {
                             console.error("Auth failed:", err);
                             setAuthError(err);
+                            clearTimeout(timer); // Clear timeout on error
                         });
                     }
                 });
-                return () => unsubscribe();
+                return () => {
+                    unsubscribe();
+                    clearTimeout(timer);
+                };
             }, []);
 
             useEffect(() => {
@@ -1050,21 +1062,28 @@
                 return [...acts].sort((a, b) => a.time.localeCompare(b.time));
             }, [tripData, selectedDate]);
 
-            if (authError) {
+            if (authError || connectionTimeout) {
                 return (
                     <div className="flex h-screen items-center justify-center bg-red-50 p-8">
                         <div className="bg-white p-6 rounded-2xl shadow-xl max-w-md text-center">
-                             <h2 className="text-2xl font-bold text-red-500 mb-2">Firebase 連線錯誤</h2>
-                             <p className="text-gray-700 mb-4">無法完成驗證，請檢查以下設定：</p>
+                             <h2 className="text-2xl font-bold text-red-500 mb-2">
+                                {authError ? "Firebase 驗證錯誤" : "連線逾時"}
+                             </h2>
+                             <p className="text-gray-700 mb-4">
+                                {authError ? "無法完成驗證，請檢查以下設定：" : "無法連接到 Firebase 服務。"}
+                             </p>
                              <ul className="text-left text-sm text-gray-600 list-disc pl-5 space-y-2 mb-6">
                                 <li>請前往 Firebase Console > <strong>Authentication</strong>。</li>
                                 <li>點擊 <strong>Sign-in method</strong> 分頁。</li>
-                                <li>啟用 <strong>Anonymous (匿名)</strong> 登入提供者。</li>
+                                <li>確保已啟用 <strong>Anonymous (匿名)</strong> 登入提供者。</li>
+                                <li>檢查您的網路連線是否正常。</li>
                              </ul>
-                             <div className="text-xs text-gray-400 break-all border p-2 rounded bg-gray-50 text-left">
-                                {authError.message || JSON.stringify(authError)}
-                             </div>
-                             <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">重試</button>
+                             {authError && (
+                                 <div className="text-xs text-gray-400 break-all border p-2 rounded bg-gray-50 text-left mb-4">
+                                    {authError.message || JSON.stringify(authError)}
+                                 </div>
+                             )}
+                             <button onClick={() => window.location.reload()} className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">重試</button>
                         </div>
                     </div>
                 );
@@ -1076,9 +1095,6 @@
                         <div className="text-center max-w-md">
                             <h2 className="text-xl font-bold text-red-500 mb-2">設定錯誤</h2>
                             <p className="text-gray-600 mb-4">未偵測到有效的 Firebase 設定，無法啟用共同編輯功能。</p>
-                            <p className="text-xs text-gray-400 bg-gray-100 p-3 rounded text-left font-mono overflow-auto">
-                                請編輯 index.html 檔案，填入正確的 apiKey, authDomain, projectId 等資訊。
-                            </p>
                         </div>
                     </div>
                 );
