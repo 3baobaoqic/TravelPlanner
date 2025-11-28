@@ -108,7 +108,7 @@
           measurementId: "G-JWWRP5LX7F"
         };
 
-        const APP_ID = 'my-travel-planner';
+        const appId = 'my-travel-planner';
 
         // ============================================================================
 
@@ -777,6 +777,7 @@
             const inputRef = useRef(null);
             const [setupForm, setSetupForm] = useState({ destination: '', startDate: new Date().toISOString().split('T')[0], endDate: new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split('T')[0], currency: 'JPY' });
             const [authError, setAuthError] = useState(null);
+            const [isCreating, setIsCreating] = useState(false); // Loading state for creation
 
             // Date Filter for Expenses
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
@@ -824,19 +825,28 @@
 
             const handleStartPlanning = async () => {
                 if (!configValid) { alert("Firebase not configured."); return; }
-                const newId = generateId();
-                const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
-                const itinerary = {}; dates.forEach(d => itinerary[d] = []);
-                const accoms = {}; dates.forEach(d => accoms[d] = { name: '', bookingCode: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] });
                 
-                const newData = {
-                    id: newId, ...setupForm, itinerary, accommodations: accoms, createdAt: Date.now(), members: defaultMembers,
-                    flights: { outbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' }, inbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' } }
-                };
+                setIsCreating(true);
+                try {
+                    const newId = generateId();
+                    const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
+                    const itinerary = {}; dates.forEach(d => itinerary[d] = []);
+                    const accoms = {}; dates.forEach(d => accoms[d] = { name: '', bookingCode: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] });
+                    
+                    const newData = {
+                        id: newId, ...setupForm, itinerary, accommodations: accoms, createdAt: Date.now(), members: defaultMembers,
+                        flights: { outbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' }, inbound: { number: '', depTime: '', depAirport: '', arrTime: '', arrAirport: '' } }
+                    };
 
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', newId), newData);
-                setTripId(newId);
-                setView('planner');
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', newId), newData);
+                    setTripId(newId);
+                    setView('planner');
+                } catch (e) {
+                    console.error("Error creating trip:", e);
+                    alert("建立旅程失敗: " + e.message);
+                } finally {
+                    setIsCreating(false);
+                }
             };
 
             const updateItinerary = (newItinerary) => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripData.id), { itinerary: newItinerary });
@@ -1097,7 +1107,13 @@
                                 <input type="date" value={setupForm.endDate} onChange={e => setSetupForm({...setupForm, endDate: e.target.value})} className="flex-1 border-2 border-gray-200 p-3 rounded-xl bg-slate-100 border-transparent" />
                             </div>
                             <div className="mb-4"><label className="block text-sm font-medium text-gray-600 mb-2">主要貨幣</label><select value={setupForm.currency} onChange={(e) => setSetupForm({...setupForm, currency: e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0ABAB5] outline-none bg-slate-100 border-transparent">{currencies.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
-                            <button onClick={handleStartPlanning} className="w-full py-4 bg-[#0ABAB5] text-white rounded-xl">開始規劃</button>
+                            <button 
+                                onClick={handleStartPlanning} 
+                                disabled={isCreating}
+                                className="w-full py-4 bg-[#0ABAB5] text-white rounded-xl disabled:opacity-70 flex items-center justify-center"
+                            >
+                                {isCreating ? <Loader className="animate-spin" /> : "開始規劃"}
+                            </button>
                         </div>
                     )}
 
