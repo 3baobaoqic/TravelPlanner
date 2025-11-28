@@ -48,6 +48,15 @@
             padding: 0;
             overflow-x: hidden;
         }
+        
+        /* Custom Select Styling */
+        .custom-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem top 50%;
+            background-size: 0.65rem auto;
+        }
     </style>
 </head>
 <body>
@@ -62,7 +71,7 @@
         import { 
             getAuth, 
             signInAnonymously, 
-            onAuthStateChanged, 
+            onAuthStateChanged,
             signInWithCustomToken
         } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { 
@@ -79,7 +88,8 @@
             Plus, Trash2, Map, ArrowRight, BookMarked, Image, Loader, X, Send, DollarSign, 
             Navigation, PieChart, ArrowLeft, Wallet, User, Menu, History, LogOut, Edit2, 
             Check, CloudSun, Thermometer, PlaneTakeoff, PlaneLanding, ArrowRightLeft, Timer, 
-            BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera 
+            BarChart3, Wand2, Mic, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera,
+            Filter
         } from 'lucide-react';
 
         // ============================================================================
@@ -95,7 +105,6 @@
   storageBucket: "travelplannerapp-276cf.firebasestorage.app",
   messagingSenderId: "253131618834",
   appId: "1:253131618834:web:54b669bf8fad3a88e276cb",
-  measurementId: "G-JWWRP5LX7F"
         };
 
         const APP_ID = 'my-travel-planner';
@@ -103,7 +112,7 @@
         // ============================================================================
 
         let app, auth, db;
-        let isDemoMode = false;
+        let isDemoMode = false; // Global Demo Mode Flag
 
         try {
             if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.apiKey !== "") {
@@ -678,7 +687,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200/60" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -714,7 +723,7 @@
             const inputRef = useRef(null);
             const [setupForm, setSetupForm] = useState({ destination: '', startDate: new Date().toISOString().split('T')[0], endDate: new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split('T')[0], currency: 'JPY' });
             
-            // NEW: Date Filter for Expenses
+            // Date Filter for Expenses
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
 
             useEffect(() => {
@@ -1111,61 +1120,81 @@
                                     </>
                                 ) : (
                                     <div className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-3 mb-6">
-                                            <button onClick={() => setView('planner')} className="p-3 rounded-2xl bg-[#6A8E83] text-white font-bold flex justify-center items-center gap-2"><ArrowLeft size={18} /> 回到行程</button>
-                                            <button onClick={() => setShowExpenseModal(true)} className="p-3 rounded-2xl bg-[#D68C68] text-white font-bold flex justify-center items-center gap-2"><Plus size={18} /> 新增消費</button>
-                                        </div>
-
-                                        {/* Date Filter for Expense View */}
-                                        <div className="flex gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar">
-                                            <button 
-                                                onClick={() => setExpenseFilterDate('all')}
-                                                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all ${expenseFilterDate === 'all' ? 'bg-gray-800 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
-                                            >
-                                                全部日期
-                                            </button>
-                                            {getDatesArray(tripData.startDate, tripData.endDate).map(date => (
-                                                <button 
-                                                    key={date}
-                                                    onClick={() => setExpenseFilterDate(date)}
-                                                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all ${expenseFilterDate === date ? 'bg-[#0ABAB5] text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                                        {/* Header Row for Expense View */}
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
+                                                <History size={20} className="text-[#D68C68]" /> 交易紀錄
+                                            </h3>
+                                            <div className="relative">
+                                                <select 
+                                                    value={expenseFilterDate}
+                                                    onChange={(e) => setExpenseFilterDate(e.target.value)}
+                                                    className="custom-select pl-3 pr-8 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-bold rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-[#0ABAB5] cursor-pointer"
                                                 >
-                                                    {date.slice(5)}
-                                                </button>
-                                            ))}
+                                                    <option value="all">全部日期</option>
+                                                    {getDatesArray(tripData.startDate, tripData.endDate).map(date => (
+                                                        <option key={date} value={date}>{date}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                                    <Filter size={12} />
+                                                </div>
+                                            </div>
                                         </div>
 
+                                        {/* Transaction List (Moved to Top) */}
                                         <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
-                                            <h3 className="font-bold text-gray-700 mb-4">支出統計</h3>
-                                            <SimplePieChart data={expenseData} />
-                                        </div>
-                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
-                                            <h3 className="font-bold text-gray-700 mb-4">每日趨勢</h3>
-                                            <SimpleBarChart data={dailyExpenseData} />
-                                        </div>
-                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
-                                            <h3 className="font-bold text-gray-700 mb-4">交易紀錄</h3>
                                             {sortedExpensesByDate.length === 0 ? (
-                                                <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">尚無消費紀錄</div>
+                                                <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-xl">尚無消費紀錄</div>
                                             ) : (
                                                 <div className="space-y-4">
                                                     {sortedExpensesByDate.map(({ date, items }) => (
                                                         <div key={date}>
-                                                            <h4 className="text-xs font-bold text-gray-500 bg-gray-200 px-2 py-1 rounded-md inline-block mb-2">{date} ({getDayOfWeek(date)})</h4>
-                                                            {items.map(e => (
-                                                                <div key={e.id} className="flex justify-between py-2 border-b border-gray-300 last:border-0">
-                                                                    <div>
-                                                                        <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
-                                                                        <div className="text-xs text-gray-500 flex items-center gap-1">{e.category} <span className="text-gray-400">|</span> {e.payer}</div>
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span className="text-xs font-bold text-gray-600 bg-white px-2 py-1 rounded-md shadow-sm border border-gray-100">{date}</span>
+                                                                <span className="text-[10px] text-gray-400">({getDayOfWeek(date)})</span>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {items.map(e => (
+                                                                    <div key={e.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg shadow-sm border border-gray-100">
+                                                                        <div className="flex flex-col">
+                                                                            <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
+                                                                            <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                                                <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{e.category}</span>
+                                                                                <span>•</span>
+                                                                                <span>{e.payer}</span>
+                                                                                {e.time && <span>• {e.time}</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-red-500 font-bold text-sm bg-red-50 px-2 py-1 rounded-lg">
+                                                                            -{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-red-600 font-bold text-sm">-{e.cost} {e.currency}</div>
-                                                                </div>
-                                                            ))}
+                                                                ))}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Charts (Below Transaction List) */}
+                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-300">
+                                            <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
+                                            <SimplePieChart data={expenseData} />
+                                        </div>
+                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-300">
+                                            <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart size={16} /> 每日趨勢</h3>
+                                            <SimpleBarChart data={dailyExpenseData} />
+                                        </div>
+
+                                        {/* Floating Action Button for Adding Expense */}
+                                        <button 
+                                            onClick={() => setShowExpenseModal(true)}
+                                            className="fixed bottom-6 right-6 w-14 h-14 bg-[#D68C68] text-white rounded-full shadow-xl flex items-center justify-center hover:bg-[#bf7652] active:scale-95 transition-all z-50"
+                                        >
+                                            <Plus size={28} />
+                                        </button>
                                     </div>
                                 )}
                             </div>
