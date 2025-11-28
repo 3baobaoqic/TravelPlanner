@@ -112,7 +112,7 @@
         // ============================================================================
 
         let app, auth, db;
-        let isDemoMode = false; // Global Demo Mode Flag
+        let isDemoMode = false;
 
         try {
             if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.apiKey !== "") {
@@ -687,7 +687,7 @@
                     const displayHeight = Math.max(heightPercent, 2); 
                     return (
                         <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-gray-100/80 border border-gray-200" style={{ height: `${displayHeight}%` }}>
+                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-200/60" style={{ height: `${displayHeight}%` }}>
                             {item.breakdown.map((seg, idx) => {
                                 const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
                                 if(segHeight <= 0) return null;
@@ -1143,7 +1143,7 @@
                                         </div>
 
                                         {/* Transaction List (Moved to Top) */}
-                                        <div className="bg-slate-200/50 p-4 rounded-xl shadow-sm border border-gray-200">
+                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-200">
                                             {sortedExpensesByDate.length === 0 ? (
                                                 <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-xl">尚無消費紀錄</div>
                                             ) : (
@@ -1179,12 +1179,12 @@
                                         </div>
 
                                         {/* Charts (Below Transaction List) */}
-                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-300">
+                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-200">
                                             <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
                                             <SimplePieChart data={expenseData} />
                                         </div>
-                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-300">
-                                            <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart size={16} /> 每日趨勢</h3>
+                                        <div className="bg-gray-100 p-4 rounded-xl shadow-sm border border-gray-200">
+                                            <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
                                             <SimpleBarChart data={dailyExpenseData} />
                                         </div>
 
