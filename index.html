@@ -50,7 +50,7 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Wifi, WifiOff, Edit3, CloudCog, Shield, Save, UserX } from 'lucide-react';
+        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Wifi, WifiOff, Edit3, CloudCog, Shield, Save, UserX, Copy } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
@@ -718,7 +718,7 @@
                             <button onClick={() => setIsMenuOpen(true)}><Menu size={24}/></button>
                             <h1 className="font-bold leading-tight text-lg">{tripData.destination}</h1>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                              <button 
                                 onClick={onConfig} 
                                 className="w-8 h-8 bg-[#008985] rounded-full flex items-center justify-center hover:opacity-90 transition-all text-white"
@@ -1175,17 +1175,52 @@
                     <div className={`absolute inset-0 z-50 bg-black/50 ${!isMenuOpen && 'hidden'}`} onClick={()=>setIsMenuOpen(false)}>
                         <div className="w-72 bg-[#F5FDFC] h-full p-4" onClick={e=>e.stopPropagation()}>
                             <h2 className="text-lg font-bold text-[#0ABAB5] mb-4">Good Travel Plan</h2>
-                            <button onClick={()=>{setView('setup'); setIsMenuOpen(false);}} className="w-full text-left p-2 hover:bg-gray-100 rounded mb-2">建立新旅程</button>
+                            
+                            {/* Added Trip ID Display inside Sidebar */}
+                            {tripData && view !== 'setup' && (
+                                <div className="mb-4 p-3 bg-white border border-[#eeeeee] rounded-xl shadow-sm">
+                                    <label className="text-[10px] font-bold text-gray-400 block mb-1">旅程 ID (點擊複製)</label>
+                                    <div 
+                                        className="text-xl font-bold text-gray-700 flex items-center gap-2 cursor-pointer active:scale-95 transition-transform"
+                                        onClick={() => {
+                                            const textArea = document.createElement("textarea");
+                                            textArea.value = tripData.id;
+                                            document.body.appendChild(textArea);
+                                            textArea.select();
+                                            document.execCommand("Copy");
+                                            textArea.remove();
+                                            alert("ID 已複製: " + tripData.id); 
+                                        }}
+                                    >
+                                        {tripData.id}
+                                        <span className="text-xs text-[#0ABAB5] bg-[#0ABAB5]/10 px-2 py-1 rounded-full">COPY</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <button onClick={()=>{setView('setup'); setIsMenuOpen(false);}} className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 font-bold text-gray-600">建立新旅程</button>
                             {view !== 'setup' && (
                                 <button 
                                     onClick={() => { setModals({ ...modals, members: true }); setIsMenuOpen(false); }} 
-                                    className="w-full text-left p-2 hover:bg-gray-100 rounded mb-2 flex items-center gap-2 text-gray-700"
+                                    className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
                                 >
                                     <Users size={18} /> 旅伴管理
                                 </button>
                             )}
-                            <h3 className="text-xs font-bold text-gray-400 mt-4 mb-2">近期</h3>
-                            {recentTrips.map(t => <div key={t.id} onClick={()=>{setTripId(t.id); setView('planner'); setIsMenuOpen(false);}} className="p-2 hover:bg-gray-100 rounded cursor-pointer flex justify-between"><div><div className="font-bold">{t.destination}</div><div className="text-xs text-gray-400">{t.dateRange}</div></div><button onClick={e=>{e.stopPropagation(); setConfirm({open:true, msg:'刪除紀錄?', action:()=>setRecentTrips(p=>p.filter(x=>x.id!==t.id))})}}><Trash2 size={14}/></button></div>)}
+                            <div className="mt-4 border-t border-gray-200 pt-4 flex-1 overflow-y-auto">
+                                <h3 className="text-xs font-bold text-gray-400 mb-2">近期紀錄</h3>
+                                <div className="space-y-1">
+                                    {recentTrips.map(t => (
+                                        <div key={t.id} onClick={()=>{setTripId(t.id); setView('planner'); setIsMenuOpen(false);}} className="p-3 hover:bg-white hover:shadow-sm rounded-xl cursor-pointer flex justify-between items-center transition-all group border border-transparent hover:border-gray-100">
+                                            <div>
+                                                <div className="font-bold text-gray-700">{t.destination}</div>
+                                                <div className="text-xs text-gray-400">{t.dateRange}</div>
+                                            </div>
+                                            <button onClick={e=>{e.stopPropagation(); setConfirm({open:true, msg:'刪除紀錄?', action:()=>setRecentTrips(p=>p.filter(x=>x.id!==t.id))})}} className="text-gray-300 hover:text-red-400 p-1"><Trash2 size={14}/></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
