@@ -170,7 +170,6 @@
                     const tempAppName = 'test-' + Date.now();
                     const tempApp = initializeApp(config, tempAppName);
                     const tempAuth = getAuth(tempApp);
-                    // Add timeout to prevent hanging
                     await Promise.race([
                         signInAnonymously(tempAuth),
                         new Promise((_, reject) => setTimeout(() => reject(new Error('連線逾時')), 5000))
@@ -241,8 +240,8 @@
                                 <WifiOff size={20} /> 單機版建立
                             </button>
                         </div>
-
-                        {/* Join Trip Section - Moved from SetupView */}
+                        
+                        {/* Join Trip Section */}
                         <div className="mb-6 pt-4 border-t border-gray-200">
                              <h3 className="text-sm font-bold text-gray-500 mb-3">加入現有旅程</h3>
                              <div className="flex gap-2">
@@ -308,10 +307,11 @@
             </div>
         );
 
-        const MemberManagementModal = ({ isOpen, onClose, tripData, currentMember, onUpdateMember, onRemoveMember }) => {
+        const MemberManagementModal = ({ isOpen, onClose, tripData, currentMember, onUpdateMember, onRemoveMember, onAddMember }) => {
             const [editingIndex, setEditingIndex] = useState(null);
             const [editForm, setEditForm] = useState({ name: '', pin: '' });
             const [confirmRemove, setConfirmRemove] = useState(null);
+            const [newMemberName, setNewMemberName] = useState('');
 
             if (!isOpen || !tripData) return null;
 
@@ -335,6 +335,22 @@
                 setConfirmRemove(index);
             };
 
+            const handleAddClick = () => {
+                if (!newMemberName.trim()) return;
+                if (tripData.members.some(m => m.name === newMemberName.trim())) {
+                    alert("此暱稱已存在");
+                    return;
+                }
+                const newMember = {
+                    name: newMemberName.trim(),
+                    pin: Math.random().toString().slice(2, 6), // Simple 4 digit pin
+                    role: 'collaborator',
+                    deviceId: 'virtual-' + Date.now()
+                };
+                onAddMember(newMember);
+                setNewMemberName('');
+            };
+
             return (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center px-4">
                     <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
@@ -343,6 +359,20 @@
                             <h3 className="text-lg font-bold text-[#0ABAB5] flex items-center gap-2"><Users size={20}/> 旅伴管理</h3>
                             <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
                         </div>
+                        
+                        {isOwner && (
+                            <div className="flex gap-2 mb-4 border-b border-gray-100 pb-3">
+                                <input 
+                                    value={newMemberName} 
+                                    onChange={e => setNewMemberName(e.target.value)}
+                                    className="flex-1 p-2 text-sm bg-[#E2E2E2] border border-[#eeeeee] rounded-lg outline-none focus:border-[#0ABAB5]"
+                                    placeholder="輸入新旅伴姓名..."
+                                />
+                                <button onClick={handleAddClick} disabled={!newMemberName.trim()} className="bg-[#0ABAB5] text-white px-4 rounded-lg text-sm font-bold flex items-center gap-1 disabled:opacity-50">
+                                    <Plus size={16} /> 新增
+                                </button>
+                            </div>
+                        )}
 
                         <div className="space-y-3 overflow-y-auto p-1">
                             {tripData.members.map((member, index) => {
@@ -1542,27 +1572,67 @@
                                                 <h2 className="text-3xl font-bold text-[#0ABAB5]">Travel Planner</h2>
                                             </div>
 
-                                            {/* Tabs - REMOVED since Join is now in Landing */}
+                                            {/* Tabs */}
+                                            <div className="flex mb-6 border-b border-gray-200">
+                                                <button 
+                                                    onClick={() => setSetupTab('create')} 
+                                                    className={`flex-1 pb-2 text-sm font-bold transition-colors ${setupTab === 'create' ? 'text-[#0ABAB5] border-b-2 border-[#0ABAB5]' : 'text-gray-400'}`}
+                                                >
+                                                    建立旅程
+                                                </button>
+                                                <button 
+                                                    onClick={() => setSetupTab('join')} 
+                                                    className={`flex-1 pb-2 text-sm font-bold transition-colors ${setupTab === 'join' ? 'text-[#0ABAB5] border-b-2 border-[#0ABAB5]' : 'text-gray-400'}`}
+                                                >
+                                                    加入旅程
+                                                </button>
+                                            </div>
+
                                             {/* Content Area */}
                                             <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
-                                                {/* Setup Form (Create Trip) */}
-                                                <div className="space-y-4">
-                                                    <div className="space-y-3 p-1">
-                                                        <input placeholder="目的地" value={setupForm.destination} onChange={e=>setSetupForm({...setupForm, destination:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
-                                                        <div className="flex gap-2">
-                                                            <input type="date" value={setupForm.startDate} onChange={e=>setSetupForm({...setupForm, startDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
-                                                            <input type="date" value={setupForm.endDate} onChange={e=>setSetupForm({...setupForm, endDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
+                                                {setupTab === 'create' ? (
+                                                    <div className="space-y-4">
+                                                        <div className="space-y-3 p-1">
+                                                            <input placeholder="目的地" value={setupForm.destination} onChange={e=>setSetupForm({...setupForm, destination:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
+                                                            <div className="flex gap-2">
+                                                                <input type="date" value={setupForm.startDate} onChange={e=>setSetupForm({...setupForm, startDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
+                                                                <input type="date" value={setupForm.endDate} onChange={e=>setSetupForm({...setupForm, endDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
+                                                            </div>
+                                                            <select value={setupForm.currency} onChange={e=>setSetupForm({...setupForm, currency:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700">
+                                                                {currencies.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
+                                                            </select>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <input placeholder="您的暱稱" value={setupForm.nickname} onChange={e=>setSetupForm({...setupForm, nickname:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
+                                                                <input type="password" placeholder="設定 PIN 碼" value={setupForm.pin} onChange={e=>setSetupForm({...setupForm, pin:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
+                                                            </div>
+                                                            <button onClick={handleStart} disabled={isCreating} className="w-full py-3.5 bg-[#0ABAB5] text-white rounded-xl font-bold shadow-sm hover:bg-[#008985] transition-all mt-4 flex items-center justify-center">{isCreating ? <Loader className="animate-spin" /> : '開始規劃'}</button>
                                                         </div>
-                                                        <select value={setupForm.currency} onChange={e=>setSetupForm({...setupForm, currency:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700">
-                                                            {currencies.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
-                                                        </select>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <input placeholder="您的暱稱" value={setupForm.nickname} onChange={e=>setSetupForm({...setupForm, nickname:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
-                                                            <input type="password" placeholder="設定 PIN 碼" value={setupForm.pin} onChange={e=>setSetupForm({...setupForm, pin:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
-                                                        </div>
-                                                        <button onClick={handleStart} disabled={isCreating} className="w-full py-3.5 bg-[#0ABAB5] text-white rounded-xl font-bold shadow-sm hover:bg-[#008985] transition-all mt-4 flex items-center justify-center">{isCreating ? <Loader className="animate-spin" /> : '開始規劃'}</button>
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div className="space-y-4 p-1">
+                                                        <div className="bg-[#F5FDFC] border border-[#eeeeee] rounded-xl p-4">
+                                                            <label className="text-xs font-bold text-gray-500 block mb-2">輸入旅程 ID</label>
+                                                            <div className="flex gap-2">
+                                                                <input 
+                                                                    placeholder="例如：x9z8y7" 
+                                                                    value={joinId} 
+                                                                    onChange={e => setJoinId(e.target.value)} 
+                                                                    className="flex-1 p-3 bg-[#E2E2E2] border border-[#eeeeee] rounded-xl text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5]" 
+                                                                />
+                                                                <button 
+                                                                    onClick={handleLocalJoin} 
+                                                                    className="bg-gray-800 text-white px-6 rounded-xl font-bold hover:bg-gray-700 transition-all"
+                                                                >
+                                                                    讀取
+                                                                </button>
+                                                            </div>
+                                                            <p className="text-[10px] text-gray-400 mt-2">
+                                                                * 此模式為單機版，僅能讀取儲存於本機瀏覽器中的旅程。
+                                                                <br/>如果是雲端模式，請確保您已連線。
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* Recent Trips Cards */}
                                                 {recentTrips.length > 0 && (
@@ -1762,7 +1832,7 @@
                                                 />
                                                 {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
                                                 <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
-                                                <MemberManagementModal isOpen={modals.members} onClose={() => setModals({ ...modals, members: false })} tripData={tripData} currentMember={currentMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} />
+                                                <MemberManagementModal isOpen={modals.members} onClose={() => setModals({ ...modals, members: false })} tripData={tripData} currentMember={currentMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} onAddMember={handleAddMember} />
                                                             <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
                                             </>
                                         )
