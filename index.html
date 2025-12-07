@@ -120,7 +120,7 @@
         const getMonthDay = (d) => { const date = new Date(d); return `${date.getMonth()+1}/${date.getDate()}`; };
 
         // --- New Landing Page (Firebase Setup) ---
-        const LandingView = ({ onConnect, onOffline }) => {
+        const LandingView = ({ onConnect, onOffline, recentTrips, onLoadTrip, onDeleteTrip }) => {
             const [configInput, setConfigInput] = useState('');
             const [testStatus, setTestStatus] = useState('idle');
             const [errorMessage, setErrorMessage] = useState('');
@@ -188,16 +188,15 @@
             };
 
             return (
-                <div className="flex flex-col h-full p-8 bg-[#F5FDFC]">
-                    <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
-                        <div className="text-center mb-8">
+                <div className="flex flex-col h-full p-8 bg-[#F5FDFC] overflow-y-auto no-scrollbar">
+                    <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full min-h-0">
+                        <div className="text-center mb-8 shrink-0">
                             <h1 className="text-3xl font-bold text-[#0ABAB5] mb-2">Good Travel Plan</h1>
                             <p className="text-gray-500 text-sm">請先設定連線以啟用雲端同步功能</p>
                         </div>
 
-                        <div className="bg-gray-100 p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                        <div className="bg-gray-100 p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 shrink-0">
                             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">Firebase Configuration</label>
-                            {/* Changed bg-gray-50 to bg-[#E2E2E2] to avoid white */}
                             <textarea 
                                 value={configInput}
                                 onChange={(e) => setConfigInput(e.target.value)}
@@ -206,7 +205,6 @@
                             />
                             
                             <div className="flex items-center gap-3">
-                                {/* Test Connection button bg changed to avoid white-ish if idle */}
                                 <button 
                                     onClick={handleTestConnection}
                                     disabled={testStatus === 'testing'}
@@ -221,7 +219,7 @@
                             {errorMessage && <p className="text-red-500 text-[10px] mt-2">{errorMessage}</p>}
                         </div>
 
-                        <div className="flex gap-2 w-full">
+                        <div className="flex gap-2 w-full shrink-0">
                             <button 
                                 onClick={handleSave}
                                 disabled={testStatus !== 'success'}
@@ -238,6 +236,34 @@
                                 <WifiOff size={20} /> 單機版
                             </button>
                         </div>
+                        
+                        {/* Joined Trips Record Section */}
+                        {recentTrips && recentTrips.length > 0 && (
+                            <div className="mt-8 border-t border-gray-200 pt-6 pb-4">
+                                 <h3 className="text-sm font-bold text-gray-500 mb-3">已加入旅程記錄</h3>
+                                 <div className="space-y-3">
+                                     {recentTrips.map(t => (
+                                         <div key={t.id} onClick={() => onLoadTrip(t.id)} className="group bg-[#EDF7F6] border border-gray-200 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-[#0ABAB5] transition-all shadow-sm">
+                                             <div className="bg-[#F5FDFC] rounded-lg p-2 w-14 h-14 flex flex-col items-center justify-center text-[#0ABAB5] border border-[#eeeeee]">
+                                                 <span className="text-[10px] font-bold uppercase">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[0] : 'N/A'}月</span>
+                                                 <span className="text-lg font-bold leading-none">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[1] : '--'}</span>
+                                             </div>
+                                             
+                                             <div className="flex-1">
+                                                 <h4 className="font-bold text-gray-800 text-lg">{t.destination}</h4>
+                                                 <p className="text-xs text-gray-400 mt-0.5">{t.dateRange}</p>
+                                             </div>
+
+                                             <div className="flex flex-col items-end gap-2">
+                                                 <button onClick={(e) => onDeleteTrip(t.id, e)} className="p-2 text-gray-300 hover:text-red-400 transition-colors">
+                                                     <Trash2 size={16} />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -292,9 +318,6 @@
                         <div className="flex justify-between items-center mb-4 border-b border-[#eeeeee] pb-2">
                             <h3 className="text-lg font-bold text-[#0ABAB5] flex items-center gap-2"><Users size={20}/> 旅伴管理</h3>
                             <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
-                        </div>
-                        <div className="p-2 bg-yellow-50 rounded mb-2 text-xs text-yellow-600 border border-yellow-100">
-                           單機模式下，旅伴管理僅用於模擬多人分帳功能。
                         </div>
 
                         <div className="space-y-3 overflow-y-auto p-1">
@@ -1213,7 +1236,7 @@
                 const newItinerary = { ...tripData.itinerary, [newEndDate]: [] };
                 const newAccommodations = { ...tripData.accommodations, [newEndDate]: [{ id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }] };
                 const newData = { ...tripData, endDate: newEndDate, itinerary: newItinerary, accommodations: newAccommodations };
-                updateTripFull(newData);
+                updateTripData(newData);
             };
 
             const handleUpdateAccommodation = (id, field, val) => { if(!isOwner) return; let currentList = tripData.accommodations[selectedDate]; if (!Array.isArray(currentList)) currentList = [currentList]; const newList = currentList.map(item => item.id === id ? { ...item, [field]: val } : item); updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList }); };
@@ -1343,6 +1366,12 @@
                                 <LandingView 
                                     onConnect={(config) => handleConfigUpdate(config).then(() => setView('setup'))}
                                     onOffline={() => handleConfigUpdate(null).then(() => setView('setup'))}
+                                    recentTrips={recentTrips}
+                                    onLoadTrip={(id) => {
+                                        setTripId(id);
+                                        // The useEffect will handle the view switch to planner
+                                    }}
+                                    onDeleteTrip={handleDeleteTrip}
                                 />
                             ) : (
                                 <>
@@ -1606,7 +1635,7 @@
                                                                                         <div className="flex flex-col">
                                                                                             <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
                                                                                             <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                                                                <span className="bg-[#E2E2E2] px-1.5 py-0.5 rounded text-gray-500">{e.category}</span>
+                                                                                                <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{e.category}</span>
                                                                                                 <span>•</span><span>{e.payer}</span>
                                                                                                 {e.time && <span>• {e.time}</span>}
                                                                                             </div>
