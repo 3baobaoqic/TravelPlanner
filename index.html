@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Good Travel Plan</title>
+    <title>Good Travel Plan (Local)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="importmap">
@@ -47,6 +47,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef, useMemo } from 'react';
         import { createRoot } from 'react-dom/client';
+        // Re-introduced Firebase imports for Hybrid Mode
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
@@ -169,7 +170,11 @@
                     const tempAppName = 'test-' + Date.now();
                     const tempApp = initializeApp(config, tempAppName);
                     const tempAuth = getAuth(tempApp);
-                    await signInAnonymously(tempAuth);
+                    // Add timeout to prevent hanging
+                    await Promise.race([
+                        signInAnonymously(tempAuth),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('連線逾時')), 5000))
+                    ]);
                     await deleteApp(tempApp);
                     setTestStatus('success');
                 } catch (e) {
@@ -329,11 +334,9 @@
                                 const canRemove = isOwner && !isMemberOwner; 
 
                                 return (
-                                    // Removed bg-white, changed to bg-[#EDF7F6] to differentiate
                                     <div key={index} className={`p-3 rounded-xl border ${isSelf ? 'border-[#0ABAB5] bg-[#E0F2F1]' : 'border-[#eeeeee] bg-[#EDF7F6]'} flex items-center justify-between`}>
                                         {isEditing ? (
                                             <div className="flex-1 flex gap-2 items-center">
-                                                {/* Input background changed to #E2E2E2 */}
                                                 <input 
                                                     value={editForm.name} 
                                                     onChange={e => setEditForm({...editForm, name: e.target.value})}
@@ -892,17 +895,26 @@
                  // If we have active apps, try to delete them to start fresh (simple hot reload logic)
                  if (getApps().length > 0) {
                      try {
-                        await Promise.all(getApps().map(app => deleteApp(app)));
-                     } catch(e) { console.warn("Cleanup failed", e); }
+                        // FIX: Add timeout to prevent deadlock
+                        await Promise.race([
+                            Promise.all(getApps().map(app => deleteApp(app))),
+                            new Promise(resolve => setTimeout(resolve, 1500))
+                        ]);
+                     } catch(e) { console.warn("Cleanup timeout/failed", e); }
                  }
 
                  try {
-                    const app = initializeApp(config);
+                    // FIX: Use unique app name to avoid collision if deleteApp failed/timed out
+                    const app = initializeApp(config, `app-${Date.now()}`);
                     const auth = getAuth(app);
                     const db = getFirestore(app);
                     
                     // Wait for auth state
-                    await signInAnonymously(auth);
+                    await Promise.race([
+                        signInAnonymously(auth),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('連線逾時')), 5000))
+                    ]);
+                    
                     setIsOffline(false);
                     setUser(auth.currentUser);
                     
@@ -1226,7 +1238,7 @@
                     const updated = recentTrips.filter(t => t.id !== id);
                     setRecentTrips(updated);
                     localStorage.setItem('gtp_recent_trips', JSON.stringify(updated));
-                    localStorage.removeItem(`gtp_trip_${id}`);
+                    if(isOffline) localStorage.removeItem(`gtp_trip_${id}`);
                 }});
             };
 
@@ -1236,7 +1248,7 @@
                 const newItinerary = { ...tripData.itinerary, [newEndDate]: [] };
                 const newAccommodations = { ...tripData.accommodations, [newEndDate]: [{ id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }] };
                 const newData = { ...tripData, endDate: newEndDate, itinerary: newItinerary, accommodations: newAccommodations };
-                updateTripData(newData);
+                updateTripFull(newData);
             };
 
             const handleUpdateAccommodation = (id, field, val) => { if(!isOwner) return; let currentList = tripData.accommodations[selectedDate]; if (!Array.isArray(currentList)) currentList = [currentList]; const newList = currentList.map(item => item.id === id ? { ...item, [field]: val } : item); updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList }); };
@@ -1626,23 +1638,23 @@
                                                                     {sortedExpensesByDate.map(({ date, items }) => (
                                                                         <div key={date}>
                                                                             <div className="flex items-center gap-2 mb-2">
-                                                                                <span className="text-[10px] font-bold text-gray-500 bg-white/60 px-1.5 py-0.5 rounded border border-gray-200">{date}</span>
+                                                                                <span className="text-[9px] font-bold text-[#00695C] bg-[#E0F2F1] px-1.5 py-0.5 rounded border border-[#B2DFDB]">{date}</span>
                                                                                 <span className="text-[10px] text-gray-400">({getDayOfWeek(date)})</span>
                                                                             </div>
                                                                             <div className="space-y-2">
                                                                                 {items.map(e => (
-                                                                                    <div key={e.id} onClick={() => setModals({...modals, transaction:e})} className="flex justify-between items-center bg-[#EDF7F6] p-2.5 rounded-lg border border-[#E0F2F1] active:scale-[0.99] transition-transform cursor-pointer">
+                                                                                    <div key={e.id} onClick={() => setModals({...modals, transaction:e})} className="flex justify-between items-center bg-[#E0F2F1] p-2.5 rounded-lg border border-[#B2DFDB] active:scale-[0.99] transition-transform cursor-pointer">
                                                                                         <div className="flex flex-col">
                                                                                             <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
-                                                                                            <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                                                                <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{e.category}</span>
+                                                                                            <div className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                                                                                <span className="bg-[#B2DFDB]/40 px-1.5 py-0.5 rounded text-gray-600">{e.category}</span>
                                                                                                 <span>•</span><span>{e.payer}</span>
                                                                                                 {e.time && <span>• {e.time}</span>}
                                                                                             </div>
                                                                                         </div>
                                                                                         <div className="flex items-center gap-3">
-                                                                                            <div className="text-red-500 font-bold text-sm bg-red-50 px-2 py-1 rounded-lg">-{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span></div>
-                                                                                            <button onClick={(evt) => { evt.stopPropagation(); deleteTransaction(e.id, date, e); }} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"><Trash2 size={16} /></button>
+                                                                                            <div className="text-red-500 font-bold text-sm bg-white/50 px-2 py-1 rounded-lg border border-red-100">-{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span></div>
+                                                                                            <button onClick={(evt) => { evt.stopPropagation(); deleteTransaction(e.id, date, e); }} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-white/50 transition-colors"><Trash2 size={16} /></button>
                                                                                         </div>
                                                                                     </div>
                                                                                 ))}
