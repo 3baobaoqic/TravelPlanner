@@ -1088,7 +1088,6 @@
                                     const found = d.members.find(m => m.deviceId === currentAuthUser.uid);
                                     if (found) {
                                         setCurrentMember(found);
-                                        // Force redirect from landing/setup to planner
                                         if(view === 'landing' || view === 'setup') {
                                             setView('planner');
                                             setSelectedDate(d.startDate);
@@ -1698,7 +1697,7 @@
                                                                                 </div>
                                                                                 <div className="space-y-2">
                                                                                     {items.map(e => (
-                                                                                        <div key={e.id} onClick={() => setModals({...modals, transaction:e})} className="flex justify-between items-center bg-[#EDF7F6] p-2.5 rounded-lg border border-[#E0F2F1] active:scale-[0.99] transition-transform cursor-pointer">
+                                                                                        <div key={e.id} onClick={() => setModals({...modals, transaction:e})} className="flex justify-between items-center bg-[#E0F2F1] p-2.5 rounded-lg border border-[#B2DFDB] active:scale-[0.99] transition-transform cursor-pointer">
                                                                                             <div className="flex flex-col">
                                                                                                 <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
                                                                                                 <div className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
