@@ -170,6 +170,7 @@
                     const tempAppName = 'test-' + Date.now();
                     const tempApp = initializeApp(config, tempAppName);
                     const tempAuth = getAuth(tempApp);
+                    // Add timeout to prevent hanging
                     await Promise.race([
                         signInAnonymously(tempAuth),
                         new Promise((_, reject) => setTimeout(() => reject(new Error('連線逾時')), 5000))
@@ -383,9 +384,11 @@
                                 const canRemove = isOwner && !isMemberOwner; 
 
                                 return (
+                                    // Removed bg-white, changed to bg-[#EDF7F6] to differentiate
                                     <div key={index} className={`p-3 rounded-xl border ${isSelf ? 'border-[#0ABAB5] bg-[#E0F2F1]' : 'border-[#eeeeee] bg-[#EDF7F6]'} flex items-center justify-between`}>
                                         {isEditing ? (
                                             <div className="flex-1 flex gap-2 items-center">
+                                                {/* Input background changed to #E2E2E2 */}
                                                 <input 
                                                     value={editForm.name} 
                                                     onChange={e => setEditForm({...editForm, name: e.target.value})}
@@ -1153,6 +1156,10 @@
                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecent));
                     setTripData(newData);
                     setCurrentMember(initialMember);
+                    
+                    // FIX: Explicitly set selectedDate so the UI renders content immediately
+                    setSelectedDate(newData.startDate);
+                    
                     setTripId(id);
                     setView('planner');
                 } else {
@@ -1163,8 +1170,13 @@
                          try {
                             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', id), sanitizeFirestoreData(newData));
                             setTripId(id);
+                            
+                            // FIX: Explicitly set selectedDate for online creation as well
+                            setSelectedDate(newData.startDate);
+                            // Ensure member is set for online mode transition
                             setCurrentMember(initialMember);
                             setView('planner');
+                            
                          } catch (e) {
                              console.error(e);
                              alert("建立失敗: " + e.message);
@@ -1493,7 +1505,7 @@
                                     recentTrips={recentTrips}
                                     onLoadTrip={(id) => {
                                         setTripId(id);
-                                        setView('planner');
+                                        // The useEffect will handle the view switch to planner
                                     }}
                                     onDeleteTrip={handleDeleteTrip}
                                 />
@@ -1572,67 +1584,27 @@
                                                 <h2 className="text-3xl font-bold text-[#0ABAB5]">Travel Planner</h2>
                                             </div>
 
-                                            {/* Tabs */}
-                                            <div className="flex mb-6 border-b border-gray-200">
-                                                <button 
-                                                    onClick={() => setSetupTab('create')} 
-                                                    className={`flex-1 pb-2 text-sm font-bold transition-colors ${setupTab === 'create' ? 'text-[#0ABAB5] border-b-2 border-[#0ABAB5]' : 'text-gray-400'}`}
-                                                >
-                                                    建立旅程
-                                                </button>
-                                                <button 
-                                                    onClick={() => setSetupTab('join')} 
-                                                    className={`flex-1 pb-2 text-sm font-bold transition-colors ${setupTab === 'join' ? 'text-[#0ABAB5] border-b-2 border-[#0ABAB5]' : 'text-gray-400'}`}
-                                                >
-                                                    加入旅程
-                                                </button>
-                                            </div>
-
+                                            {/* Tabs - REMOVED since Join is now in Landing */}
                                             {/* Content Area */}
                                             <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
-                                                {setupTab === 'create' ? (
-                                                    <div className="space-y-4">
-                                                        <div className="space-y-3 p-1">
-                                                            <input placeholder="目的地" value={setupForm.destination} onChange={e=>setSetupForm({...setupForm, destination:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
-                                                            <div className="flex gap-2">
-                                                                <input type="date" value={setupForm.startDate} onChange={e=>setSetupForm({...setupForm, startDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
-                                                                <input type="date" value={setupForm.endDate} onChange={e=>setSetupForm({...setupForm, endDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
-                                                            </div>
-                                                            <select value={setupForm.currency} onChange={e=>setSetupForm({...setupForm, currency:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700">
-                                                                {currencies.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
-                                                            </select>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                <input placeholder="您的暱稱" value={setupForm.nickname} onChange={e=>setSetupForm({...setupForm, nickname:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
-                                                                <input type="password" placeholder="設定 PIN 碼" value={setupForm.pin} onChange={e=>setSetupForm({...setupForm, pin:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
-                                                            </div>
-                                                            <button onClick={handleStart} disabled={isCreating} className="w-full py-3.5 bg-[#0ABAB5] text-white rounded-xl font-bold shadow-sm hover:bg-[#008985] transition-all mt-4 flex items-center justify-center">{isCreating ? <Loader className="animate-spin" /> : '開始規劃'}</button>
+                                                {/* Setup Form (Create Trip) */}
+                                                <div className="space-y-4">
+                                                    <div className="space-y-3 p-1">
+                                                        <input placeholder="目的地" value={setupForm.destination} onChange={e=>setSetupForm({...setupForm, destination:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
+                                                        <div className="flex gap-2">
+                                                            <input type="date" value={setupForm.startDate} onChange={e=>setSetupForm({...setupForm, startDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
+                                                            <input type="date" value={setupForm.endDate} onChange={e=>setSetupForm({...setupForm, endDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-4 p-1">
-                                                        <div className="bg-[#F5FDFC] border border-[#eeeeee] rounded-xl p-4">
-                                                            <label className="text-xs font-bold text-gray-500 block mb-2">輸入旅程 ID</label>
-                                                            <div className="flex gap-2">
-                                                                <input 
-                                                                    placeholder="例如：x9z8y7" 
-                                                                    value={joinId} 
-                                                                    onChange={e => setJoinId(e.target.value)} 
-                                                                    className="flex-1 p-3 bg-[#E2E2E2] border border-[#eeeeee] rounded-xl text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5]" 
-                                                                />
-                                                                <button 
-                                                                    onClick={handleLocalJoin} 
-                                                                    className="bg-gray-800 text-white px-6 rounded-xl font-bold hover:bg-gray-700 transition-all"
-                                                                >
-                                                                    讀取
-                                                                </button>
-                                                            </div>
-                                                            <p className="text-[10px] text-gray-400 mt-2">
-                                                                * 此模式為單機版，僅能讀取儲存於本機瀏覽器中的旅程。
-                                                                <br/>如果是雲端模式，請確保您已連線。
-                                                            </p>
+                                                        <select value={setupForm.currency} onChange={e=>setSetupForm({...setupForm, currency:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700">
+                                                            {currencies.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
+                                                        </select>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <input placeholder="您的暱稱" value={setupForm.nickname} onChange={e=>setSetupForm({...setupForm, nickname:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
+                                                            <input type="password" placeholder="設定 PIN 碼" value={setupForm.pin} onChange={e=>setSetupForm({...setupForm, pin:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
                                                         </div>
+                                                        <button onClick={handleStart} disabled={isCreating} className="w-full py-3.5 bg-[#0ABAB5] text-white rounded-xl font-bold shadow-sm hover:bg-[#008985] transition-all mt-4 flex items-center justify-center">{isCreating ? <Loader className="animate-spin" /> : '開始規劃'}</button>
                                                     </div>
-                                                )}
+                                                </div>
 
                                                 {/* Recent Trips Cards */}
                                                 {recentTrips.length > 0 && (
