@@ -1505,7 +1505,7 @@
                                     recentTrips={recentTrips}
                                     onLoadTrip={(id) => {
                                         setTripId(id);
-                                        // The useEffect will handle the view switch to planner
+                                        setView('planner');
                                     }}
                                     onDeleteTrip={handleDeleteTrip}
                                 />
@@ -1606,50 +1606,7 @@
                                                     </div>
                                                 </div>
 
-                                                {/* Recent Trips Cards */}
-                                                {recentTrips.length > 0 && (
-                                                    <div className="mt-8">
-                                                        <h3 className="text-sm font-bold text-gray-500 mb-3">最近瀏覽</h3>
-                                                        <div className="space-y-3">
-                                                            {recentTrips.map((t) => (
-                                                                <div key={t.id} onClick={() => { setTripId(t.id); setView('planner'); }} className="group bg-[#EDF7F6] border border-[#eeeeee] rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-[#0ABAB5] transition-all">
-                                                                    {/* Date Box */}
-                                                                    <div className="bg-[#F5FDFC] rounded-lg p-2 w-14 h-14 flex flex-col items-center justify-center text-[#0ABAB5] border border-[#eeeeee]">
-                                                                        <span className="text-[10px] font-bold uppercase">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[0] : 'N/A'}月</span>
-                                                                        <span className="text-lg font-bold leading-none">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[1] : '--'}</span>
-                                                                    </div>
-                                                                    
-                                                                    {/* Info */}
-                                                                    <div className="flex-1">
-                                                                        <h4 className="font-bold text-gray-800 text-lg">{t.destination}</h4>
-                                                                        <p className="text-xs text-gray-400 mt-0.5">{t.dateRange}</p>
-                                                                    </div>
-
-                                                                    {/* Action */}
-                                                                    <div className="flex flex-col items-end gap-2">
-                                                                        <button onClick={(e) => handleDeleteTrip(t.id, e)} className="p-2 text-gray-300 hover:text-red-400 transition-colors">
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                        <div className="text-[#0ABAB5] opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <ArrowRight size={20} />
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Empty State */}
-                                                {recentTrips.length === 0 && (
-                                                    <div className="mt-12 flex flex-col items-center justify-center text-center opacity-50">
-                                                        <div className="w-24 h-24 bg-[#E2E2E2] rounded-full flex items-center justify-center mb-4">
-                                                            <Plane size={40} className="text-gray-400" />
-                                                        </div>
-                                                        <p className="text-sm font-bold text-gray-400">還沒有計畫嗎？</p>
-                                                        <p className="text-xs text-gray-400 mt-1">開始你的第一趟旅程吧！</p>
-                                                    </div>
-                                                )}
+                                                {/* Recent Trips Cards - REMOVED from SetupView (now in LandingView) */}
                                             </div>
                                         </div>
                                     )}
