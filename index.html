@@ -1763,7 +1763,7 @@
                                                 {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
                                                 <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
                                                 <MemberManagementModal isOpen={modals.members} onClose={() => setModals({ ...modals, members: false })} tripData={tripData} currentMember={currentMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} />
-                                                <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
+                                                            <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
                                             </>
                                         )
                                     )}
