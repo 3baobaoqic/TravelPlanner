@@ -1397,7 +1397,7 @@
                                     onOffline={() => handleConfigUpdate(null).then(() => setView('setup'))}
                                     joinId={joinId}
                                     setJoinId={setJoinId}
-                                    onJoin={() => handleLocalJoin()}
+                                    onJoin={(arg) => handleLocalJoin(typeof arg === 'string' ? arg : null)}
                                     recentTrips={recentTrips}
                                     onDeleteTrip={handleDeleteTrip}
                                 />
