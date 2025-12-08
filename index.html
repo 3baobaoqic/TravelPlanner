@@ -245,14 +245,14 @@
                         <div className="border-t border-gray-200 pt-6">
                             <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">快速讀取</h3>
                             
-                            <div className="bg-white border border-[#eeeeee] rounded-xl p-4 mb-4 shadow-sm">
+                            <div className="bg-gray-100 border border-gray-100 rounded-xl p-4 mb-4 shadow-sm">
                                 <label className="text-xs font-bold text-gray-400 block mb-2">輸入旅程 ID</label>
                                 <div className="flex gap-2">
                                     <input 
                                         placeholder="例如：x9z8y7" 
                                         value={joinId} 
                                         onChange={e => setJoinId(e.target.value)} 
-                                        className="flex-1 p-2 bg-[#F5F5F5] border border-gray-200 rounded-lg text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-sm" 
+                                        className="flex-1 p-2 bg-[#E2E2E2] border border-gray-200 rounded-lg text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-sm" 
                                     />
                                     <button 
                                         onClick={onJoin} 
@@ -847,8 +847,9 @@
             const [setupForm, setSetupForm] = useState(
                 restored?.setupForm || { 
                     destination: '', 
-                    startDate: new Date().toISOString().split('T')[0], 
-                    endDate: new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split('T')[0], 
+                    // Fix: Use local time (en-CA gives YYYY-MM-DD) instead of ISO string (UTC) to avoid incorrect date in early morning
+                    startDate: new Date().toLocaleDateString('en-CA'), 
+                    endDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'), 
                     currency: 'JPY', 
                     nickname: '', 
                     pin: '' 
@@ -944,8 +945,10 @@
                      authUnsubscribeRef.current = authUnsub;
                  } catch (e) {
                     console.error("Auto-connect failed", e);
+                    // Fallback to offline mode on error so UI doesn't freeze
                     setIsOffline(true);
-                    setUser({ uid: 'offline' });
+                    setUser({ uid: 'offline_fallback' });
+                    alert("連線失敗，將切換至離線模式。錯誤: " + e.message);
                  }
             };
 
@@ -962,8 +965,27 @@
                  setUser(null);
                  setIsOffline(true);
                  
-                 await new Promise(resolve => setTimeout(resolve, 500));
-                 await reInit(config);
+                 // Add safety timeout to prevent infinite loading
+                 const timeoutId = setTimeout(() => {
+                     setUser((currentUser) => {
+                         if (currentUser === null) {
+                             alert("連線逾時，切換至離線模式");
+                             setIsOffline(true);
+                             return { uid: 'timeout_fallback' };
+                         }
+                         return currentUser;
+                     });
+                 }, 10000); // 10 seconds timeout
+
+                 try {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await reInit(config);
+                 } catch (e) {
+                    console.error("Config update critical failure", e);
+                    setUser({ uid: 'error_fallback' });
+                 } finally {
+                    clearTimeout(timeoutId);
+                 }
             };
 
             useEffect(() => {
