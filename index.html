@@ -126,18 +126,23 @@
         // --- New Landing Page (Firebase Setup & Quick Join) ---
         const LandingView = ({ onConnect, onOffline, joinId, setJoinId, onJoin, recentTrips, onDeleteTrip }) => {
             const [configInput, setConfigInput] = useState('');
+            const [imgbbKey, setImgbbKey] = useState(''); // New state for Imgbb Key
             const [testStatus, setTestStatus] = useState('idle');
             const [errorMessage, setErrorMessage] = useState('');
 
             useEffect(() => {
-                const stored = localStorage.getItem('gtp_firebase_config');
-                if (stored) {
+                const storedConfig = localStorage.getItem('gtp_firebase_config');
+                const storedImgbb = localStorage.getItem('gtp_imgbb_key');
+                if (storedConfig) {
                     try {
-                        const parsed = JSON.parse(stored);
+                        const parsed = JSON.parse(storedConfig);
                         setConfigInput(JSON.stringify(parsed, null, 2).replace(/[{}]/g, '').trim());
                     } catch(e) {
-                        setConfigInput(stored);
+                        setConfigInput(storedConfig);
                     }
+                }
+                if (storedImgbb) {
+                    setImgbbKey(storedImgbb);
                 }
             }, []);
 
@@ -187,6 +192,7 @@
                 const config = parseConfig(configInput);
                 if (config) {
                     localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
+                    localStorage.setItem('gtp_imgbb_key', imgbbKey.trim()); // Save Imgbb Key
                     onConnect(config);
                 }
             };
@@ -201,11 +207,21 @@
 
                         <div className="bg-gray-100 p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
                             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">Firebase Configuration</label>
+                            {/* Height reduced to h-12 as requested */}
                             <textarea 
                                 value={configInput}
                                 onChange={(e) => setConfigInput(e.target.value)}
-                                className="w-full h-24 p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none focus:border-[#0ABAB5] focus:ring-1 focus:ring-[#0ABAB5] resize-none mb-4 placeholder-gray-500 text-gray-700"
+                                className="w-full h-12 p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none focus:border-[#0ABAB5] focus:ring-1 focus:ring-[#0ABAB5] resize-none mb-4 placeholder-gray-500 text-gray-700"
                                 placeholder={`apiKey: "...",\nprojectId: "..."`}
+                            />
+
+                            {/* New Imgbb API Key Input */}
+                            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">Imgbb API Key (選填 - 解鎖無限圖片)</label>
+                            <input 
+                                value={imgbbKey}
+                                onChange={(e) => setImgbbKey(e.target.value)}
+                                className="w-full p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none focus:border-[#0ABAB5] focus:ring-1 focus:ring-[#0ABAB5] mb-4 placeholder-gray-500 text-gray-700"
+                                placeholder="例如: 358e4c7980312..."
                             />
                             
                             <div className="flex items-center gap-3">
@@ -773,7 +789,7 @@
             );
         };
 
-        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, isOffline }) => {
+        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, isOffline, onOpenFirebase }) => {
             const datesList = useMemo(() => tripData ? getDatesArray(tripData.startDate, tripData.endDate) : [], [tripData]);
             
             return (
@@ -785,11 +801,13 @@
                             <h1 className="font-bold leading-tight text-lg">{tripData.destination}</h1>
                         </div>
                         <div className="flex items-center gap-1">
-                             <div 
-                                className="w-8 h-8 flex items-center justify-center text-white"
+                             <button 
+                                onClick={onOpenFirebase}
+                                className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-full transition-colors"
+                                title={isOffline ? "目前為離線模式，點擊設定連線" : "已連線至 Firebase"}
                             >
                                 {isOffline ? <WifiOff size={16} className="text-red-300"/> : <Wifi size={16} className="text-[#00FF00]"/>}
-                            </div>
+                            </button>
                         </div>
                     </div>
                     
@@ -1317,9 +1335,37 @@
             const handlePhotoUpload = async (e) => {
                 const f = e.target.files[0];
                 if (f && uploadTarget) {
+                    // 1. Always compress first
                     const b64 = await resizeImage(f);
                     if (b64) {
-                        const photoObj = { url: b64, uploader: currentMember.name };
+                        let finalUrl = b64;
+                        const imgbbKey = localStorage.getItem('gtp_imgbb_key');
+
+                        if (imgbbKey) {
+                            try {
+                                const formData = new FormData();
+                                // Imgbb expects base64 without prefix for 'image' param
+                                formData.append('image', b64.split(',')[1]); 
+                                
+                                // Note: fetch is async, UI might not show loading state explicitly here but will update on completion
+                                const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                    finalUrl = data.data.url;
+                                } else {
+                                    console.error("Imgbb error:", data);
+                                    alert("圖片上傳失敗，將使用本機儲存 (容量有限)。錯誤: " + (data.error?.message || 'Unknown'));
+                                }
+                            } catch (err) {
+                                console.error("Imgbb fetch error:", err);
+                                alert("連線 Imgbb 失敗，將使用本機儲存。");
+                            }
+                        }
+
+                        const photoObj = { url: finalUrl, uploader: currentMember.name };
                         if (uploadTarget.type === 'activity') {
                             const acts = [...tripData.itinerary[selectedDate]];
                             const idx = acts.findIndex(a=>a.id===uploadTarget.id);
