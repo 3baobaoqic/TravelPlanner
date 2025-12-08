@@ -1029,8 +1029,8 @@
                                             setSelectedDate(d.startDate);
                                         }
                                     } else {
-                                        // In setup view, we might show join modal if not member
-                                        if(view === 'setup') setModals(m => ({...m, join: true}));
+                                        // Force Join Modal for non-members
+                                        setModals(m => ({...m, join: true}));
                                     }
                                 }
                                 setRecentTrips(p => { 
@@ -1049,11 +1049,21 @@
                                     } catch (e) {
                                             console.error("Auto-upload failed", e);
                                     }
+                                } else {
+                                     // Not found anywhere
+                                     if (!isOffline) {
+                                         alert("找不到此旅程 ID，請確認 ID 是否正確。");
+                                         setTripId('');
+                                         setView('landing');
+                                     }
                                 }
                             }
                         },
                         (error) => {
                             console.error("Snapshot error:", error);
+                            alert("讀取失敗，可能是權限問題或 ID 錯誤。");
+                            setTripId('');
+                            setView('landing');
                         }
                     );
                     unsubscribeRef.current = unsub;
@@ -1487,7 +1497,14 @@
                                     )}
 
                                     {/* Planner & Expense Views */}
-                                    {(view === 'planner' || view === 'expense') && tripData && (
+                                    {(view === 'planner' || view === 'expense') && (
+                                        !tripData ? (
+                                            <div className="flex h-full items-center justify-center flex-col gap-4 text-gray-400">
+                                                 <Loader size={32} className="animate-spin text-[#0ABAB5]" />
+                                                 <p>正在搜尋旅程...</p>
+                                                 <button onClick={() => setView('landing')} className="text-sm underline hover:text-gray-600">取消</button>
+                                            </div>
+                                        ) : (
                                         <>
                                             <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} onManageMembers={() => setModals({ ...modals, members: true })} onOpenFirebase={() => setView('landing')} isOffline={isOffline} />
                                             
@@ -1608,6 +1625,7 @@
                                             <MemberManagementModal isOpen={modals.members} onClose={() => setModals({ ...modals, members: false })} tripData={tripData} currentMember={currentMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} />
                                             <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
                                         </>
+                                        )
                                     )}
                                 </>
                             )}
