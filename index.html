@@ -129,6 +129,7 @@
             const [imgbbKey, setImgbbKey] = useState(''); // New state for Imgbb Key
             const [testStatus, setTestStatus] = useState('idle');
             const [errorMessage, setErrorMessage] = useState('');
+            const [successMessage, setSuccessMessage] = useState(''); // New state for specific success message
 
             useEffect(() => {
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
@@ -168,23 +169,60 @@
             const handleTestConnection = async () => {
                 setTestStatus('testing');
                 setErrorMessage('');
+                setSuccessMessage('');
+                
+                // 1. Validate Firebase Config Format
                 const config = parseConfig(configInput);
                 if (!config || !config.apiKey || !config.projectId) {
                     setTestStatus('error');
-                    setErrorMessage('無法辨識設定檔格式');
+                    setErrorMessage('無法辨識 Firebase 設定檔格式');
                     return;
                 }
+
                 try {
+                    // 2. Test Firebase Connection
                     const tempAppName = 'test-' + Date.now();
                     const tempApp = initializeApp(config, tempAppName);
                     const tempAuth = getAuth(tempApp);
                     await signInAnonymously(tempAuth);
                     await deleteApp(tempApp);
+                    
+                    // 3. Test Imgbb Connection (if provided)
+                    let imgbbVerified = false;
+                    if (imgbbKey.trim()) {
+                        try {
+                            const formData = new FormData();
+                            // Tiny 1x1 transparent GIF for verification
+                            formData.append('image', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+                            
+                            const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey.trim()}`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const data = await res.json();
+                            
+                            if (!data.success) {
+                                throw new Error(data.error?.message || 'Invalid API Key');
+                            }
+                            imgbbVerified = true;
+                        } catch (imgError) {
+                            setTestStatus('error');
+                            setErrorMessage(`Firebase 連線成功，但 Imgbb 連線失敗: ${imgError.message}`);
+                            return;
+                        }
+                    }
+
                     setTestStatus('success');
+                    if (imgbbVerified) {
+                        setSuccessMessage('雙平台皆連線成功');
+                    } else {
+                        setSuccessMessage('Firebase 連線成功 (未設定 Imgbb)');
+                    }
+
                 } catch (e) {
                     console.error("Test failed", e);
                     setTestStatus('error');
-                    setErrorMessage(`連線失敗: ${e.message}`);
+                    setErrorMessage(`Firebase 連線失敗: ${e.message}`);
                 }
             };
 
@@ -233,7 +271,7 @@
                                 >
                                     {testStatus === 'testing' ? <Loader className="animate-spin" size={14} /> : '測試連線'}
                                 </button>
-                                {testStatus === 'success' && <span className="text-green-500 flex items-center text-xs font-bold gap-1"><Check size={14}/> 成功</span>}
+                                {testStatus === 'success' && <span className="text-green-500 flex items-center text-xs font-bold gap-1"><Check size={14}/> {successMessage}</span>}
                                 {testStatus === 'error' && <span className="text-red-500 flex items-center text-xs font-bold gap-1"><X size={14}/> 失敗</span>}
                             </div>
                             {errorMessage && <p className="text-red-500 text-[10px] mt-2">{errorMessage}</p>}
@@ -747,7 +785,7 @@
             );
         };
 
-        const ExpenseModal = ({ isOpen, onClose, tripData, onSave, onUpdateCategories, selectedDate }) => {
+        const ExpenseModal = ({ isOpen, onClose, tripData, onSave, onUpdateCategories, selectedDate, currentMember }) => {
             const [formData, setFormData] = useState({ time: '', cost: '', title: '', payer: '', currency: '', category: '', photoUrls: [] });
             const [isManage, setIsManage] = useState(false);
             const [newCat, setNewCat] = useState('');
@@ -755,8 +793,8 @@
             const fileRef = useRef(null);
             
             useEffect(() => {
-                 if(isOpen) setFormData({ time: new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}), cost: '', title: '', payer: tripData?.members?.[0]?.name || '我', currency: tripData?.currency || 'JPY', category: '餐飲', photoUrls: [] });
-            }, [isOpen, tripData]);
+                 if(isOpen) setFormData({ time: new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}), cost: '', title: '', payer: currentMember?.name || tripData?.members?.[0]?.name || '我', currency: tripData?.currency || 'JPY', category: '餐飲', photoUrls: [] });
+            }, [isOpen, tripData, currentMember]);
 
             if (!isOpen) return null;
             const handleFile = async (e) => { const f = e.target.files[0]; if(f) { const b64 = await resizeImage(f); if(b64) setFormData(p => ({...p, photoUrls: [...(p.photoUrls || []), b64]})); } e.target.value=''; };
@@ -1695,6 +1733,7 @@
                                                 }} 
                                                 onUpdateCategories={c=>updateTrip('expenseCategories',c)} 
                                                 selectedDate={selectedDate} 
+                                                currentMember={currentMember}
                                             />
                                             <ImageModal src={modals.viewingImage} onClose={()=>setModals({...modals, viewingImage:null})} />
                                             <TransactionDetailModal transaction={modals.transaction} onClose={()=>setModals({...modals, transaction:null})} onViewImage={u=>setModals({...modals, viewingImage:u})} />
