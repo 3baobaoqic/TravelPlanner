@@ -323,7 +323,7 @@
                                     <h4 className="text-xs font-bold text-gray-400 mb-2">近期紀錄</h4>
                                     <div className="space-y-2">
                                         {recentTrips.map((t) => (
-                                            <div key={t.id} onClick={() => onJoin(t.id)} className="group bg-white border border-[#eeeeee] rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-[#0ABAB5] hover:shadow-md transition-all">
+                                            <div key={t.id} onClick={() => onJoin(t.id)} className="group bg-[#EDF7F6] border border-[#eeeeee] rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-[#0ABAB5] hover:shadow-md transition-all">
                                                 <div className="bg-[#E0F2F1] rounded-lg p-2 w-10 h-10 flex flex-col items-center justify-center text-[#00695C] border border-[#B2DFDB]">
                                                     <span className="text-[8px] font-bold uppercase">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[0] : 'N/A'}月</span>
                                                     <span className="text-sm font-bold leading-none">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[1] : '--'}</span>
