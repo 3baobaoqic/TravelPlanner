@@ -1494,65 +1494,88 @@
                 }});
             };
 
-            const expenseData = useMemo(() => {
+            // Modified: Group statistics by currency to allow vertical stacking of charts
+            const expenseStatsByCurrency = useMemo(() => {
                 if (!tripData) return [];
-                let targetActivities = [];
-                // 先根據日期篩選出活動範圍
-                if (expenseFilterDate === 'all') { targetActivities = Object.values(tripData.itinerary || {}).flat(); } 
-                else { targetActivities = tripData.itinerary?.[expenseFilterDate] || []; }
                 
-                // 篩選出記帳項目，並加入付款人與幣別篩選邏輯
-                const expenses = targetActivities.filter(a => 
-                    (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
-                    (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
-                    (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
-                );
+                // Determine which currencies to calculate (Selected one or All available in constants)
+                let targetCurrencies = [];
+                if (expenseFilterCurrency !== 'all') {
+                    targetCurrencies = [expenseFilterCurrency];
+                } else {
+                    targetCurrencies = currencies.map(c => c.value);
+                }
 
-                const totals = {};
-                const currentCategories = tripData.expenseCategories || Object.keys(CATEGORY_COLORS);
-                currentCategories.forEach(c => totals[c] = 0);
-                expenses.forEach(e => {
-                    let cat = e.category;
-                    if (!cat) {
-                        if (e.transport === 'expense') cat = '其他';
-                        else if (['plane','shinkansen','nightbus','train','bus','taxi','car'].includes(e.transport)) cat = '交通';
-                        else if (e.title && e.title.includes('門票')) cat = '門票';
-                        else cat = '娛樂';
-                    }
-                    totals[cat] = (totals[cat] || 0) + (e.cost || 0);
-                });
-                return Object.keys(totals).map(k => ({ category: k, value: totals[k], color: CATEGORY_COLORS[k] || '#ccc' }));
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
-
-            const dailyExpenseData = useMemo(() => {
-                if (!tripData) return [];
                 const datesToShow = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
-                return datesToShow.map(date => {
-                    // 針對每天的資料，加入付款人與幣別篩選
-                    const dayExpenses = (tripData.itinerary?.[date] || []).filter(a => 
-                        (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
-                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
-                        (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
-                    );
-                    
-                    let total = 0;
-                    const breakdown = [];
-                    const dayCatTotals = {};
-                    dayExpenses.forEach(e => {
-                        let cat = e.category;
-                        if (!cat) {
-                            if (e.transport === 'expense') cat = '其他';
-                            else if (['plane','shinkansen','nightbus','train','bus','taxi','car'].includes(e.transport)) cat = '交通';
-                            else if (e.title && e.title.includes('門票')) cat = '門票';
-                            else cat = '娛樂';
-                        }
-                        dayCatTotals[cat] = (dayCatTotals[cat] || 0) + (e.cost || 0);
-                        total += (e.cost || 0);
+                const currentCategories = tripData.expenseCategories || Object.keys(CATEGORY_COLORS);
+
+                return targetCurrencies.map(currency => {
+                    let totalForCurrency = 0;
+                    const catTotals = {};
+                    currentCategories.forEach(c => catTotals[c] = 0);
+
+                    // Calculate Bar Data (Daily Breakdown) & Accumulate Totals
+                    const barData = datesToShow.map(date => {
+                         const dayActs = tripData.itinerary?.[date] || [];
+                         
+                         // Filter relevant expenses for this day, payer, and THIS specific currency loop
+                         const relevant = dayActs.filter(a => 
+                            (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
+                            (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
+                            (a.currency === currency)
+                         );
+                         
+                         let dayTotal = 0;
+                         const dayCatBreakdown = {};
+                         
+                         relevant.forEach(e => {
+                             const cost = parseFloat(e.cost) || 0;
+                             dayTotal += cost;
+                             totalForCurrency += cost;
+                             
+                             let cat = e.category;
+                             if (!cat) {
+                                if (e.transport === 'expense') cat = '其他';
+                                else if (['plane','shinkansen','nightbus','train','bus','taxi','car'].includes(e.transport)) cat = '交通';
+                                else if (e.title && e.title.includes('門票')) cat = '門票';
+                                else cat = '娛樂';
+                             }
+                             
+                             dayCatBreakdown[cat] = (dayCatBreakdown[cat] || 0) + cost;
+                             catTotals[cat] = (catTotals[cat] || 0) + cost;
+                         });
+                         
+                         // Format breakdown for SimpleBarChart
+                         const breakdown = Object.keys(dayCatBreakdown).map(cat => ({
+                             category: cat,
+                             cost: dayCatBreakdown[cat],
+                             color: CATEGORY_COLORS[cat] || '#ccc'
+                         }));
+                         
+                         return { date, total: dayTotal, breakdown };
                     });
-                    Object.keys(dayCatTotals).forEach(cat => { breakdown.push({ category: cat, cost: dayCatTotals[cat], color: CATEGORY_COLORS[cat] || PALETTE[Math.floor(Math.random() * PALETTE.length)] }); });
-                    return { date, total, breakdown };
-                });
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
+
+                    // Format Pie Data
+                    const pieData = Object.keys(catTotals)
+                        .filter(k => catTotals[k] > 0)
+                        .map(k => ({ 
+                            category: k, 
+                            value: catTotals[k], 
+                            color: CATEGORY_COLORS[k] || '#ccc' 
+                        }));
+
+                    // Hide currency group if total is 0 AND user selected 'all' (to avoid empty charts)
+                    // But if user explicitly selected this currency, show it even if empty (0)
+                    if (expenseFilterCurrency === 'all' && totalForCurrency === 0) return null;
+
+                    return {
+                        currency,
+                        total: totalForCurrency,
+                        pieData,
+                        barData
+                    };
+                }).filter(Boolean); // Remove nulls
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]);
 
             const sortedExpensesByDate = useMemo(() => {
                 if (!tripData) return [];
@@ -1849,8 +1872,30 @@
                                                             )}
                                                         </div>
 
-                                                        <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]"><h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3><SimplePieChart data={expenseData} /></div>
-                                                        <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]"><h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3><SimpleBarChart data={dailyExpenseData} /></div>
+                                                        {/* Modified: Map through expenseStatsByCurrency to render charts vertically per currency */}
+                                                        {expenseStatsByCurrency.length === 0 && sortedExpensesByDate.length > 0 ? (
+                                                            <div className="text-center text-gray-400 text-xs mt-4">無統計數據</div>
+                                                        ) : (
+                                                            expenseStatsByCurrency.map(stat => (
+                                                                <div key={stat.currency} className="space-y-4 pt-4 mt-4 border-t-2 border-dashed border-gray-200 first:border-0 first:mt-0 first:pt-0">
+                                                                    <div className="flex items-center gap-2 px-1 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+                                                                        <div className={`h-6 w-1.5 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
+                                                                        <h4 className="font-bold text-gray-800 text-lg flex-1">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
+                                                                        <span className="text-sm font-bold text-[#D68C68] bg-[#FFF3E0] px-3 py-1 rounded-lg border border-[#FFE0B2]">總計: ${stat.total.toLocaleString()}</span>
+                                                                    </div>
+                                                                    
+                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
+                                                                        <SimplePieChart data={stat.pieData} />
+                                                                    </div>
+                                                                    
+                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
+                                                                        <SimpleBarChart data={stat.barData} />
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
