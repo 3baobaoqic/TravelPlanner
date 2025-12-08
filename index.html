@@ -55,12 +55,10 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
         // --- Constants ---
+        // Modified: Only keep JPY and TWD, default is JPY (first item usually, but logic sets it explicitly)
         const currencies = [
             { value: 'JPY', label: '日圓 (JPY)' },
-            { value: 'TWD', label: '新台幣 (NTD)' },
-            { value: 'USD', label: '美元 (USD)' },
-            { value: 'KRW', label: '韓元 (KRW)' },
-            { value: 'EUR', label: '歐元 (EUR)' }
+            { value: 'TWD', label: '新台幣 (TWD)' }
         ];
 
         const transportOptions = [
@@ -297,9 +295,9 @@
 
                         {/* --- JOIN TRIP SECTION (MOVED FROM SETUP) --- */}
                         <div className="border-t border-gray-200 pt-6">
-                            <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">快速讀取</h3>
+                            {/* Deleted "快速讀取" header as requested */}
                             
-                            <div className="bg-gray-100 border border-gray-100 rounded-xl p-4 mb-4 shadow-sm">
+                            <div className="bg-gray-100 border border-gray-100 rounded-xl p-3 mb-4 shadow-sm">
                                 <label className="text-xs font-bold text-gray-400 block mb-2">輸入旅程 ID</label>
                                 <div className="flex gap-2">
                                     <input 
@@ -968,6 +966,7 @@
             const [uploadTarget, setUploadTarget] = useState(null);
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
             const [expenseFilterPayer, setExpenseFilterPayer] = useState('all'); // 新增：付款人篩選狀態
+            const [expenseFilterCurrency, setExpenseFilterCurrency] = useState('all'); // 新增：幣別篩選狀態
             const [isCreating, setIsCreating] = useState(false); 
             const [editingActivity, setEditingActivity] = useState(null);
             const [currentMember, setCurrentMember] = useState(null); 
@@ -1502,10 +1501,11 @@
                 if (expenseFilterDate === 'all') { targetActivities = Object.values(tripData.itinerary || {}).flat(); } 
                 else { targetActivities = tripData.itinerary?.[expenseFilterDate] || []; }
                 
-                // 篩選出記帳項目，並加入付款人篩選邏輯
+                // 篩選出記帳項目，並加入付款人與幣別篩選邏輯
                 const expenses = targetActivities.filter(a => 
                     (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
-                    (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer)
+                    (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
+                    (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
                 );
 
                 const totals = {};
@@ -1522,16 +1522,17 @@
                     totals[cat] = (totals[cat] || 0) + (e.cost || 0);
                 });
                 return Object.keys(totals).map(k => ({ category: k, value: totals[k], color: CATEGORY_COLORS[k] || '#ccc' }));
-            }, [tripData, expenseFilterDate, expenseFilterPayer]); // 加入 expenseFilterPayer 依賴
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
 
             const dailyExpenseData = useMemo(() => {
                 if (!tripData) return [];
                 const datesToShow = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
                 return datesToShow.map(date => {
-                    // 針對每天的資料，加入付款人篩選
+                    // 針對每天的資料，加入付款人與幣別篩選
                     const dayExpenses = (tripData.itinerary?.[date] || []).filter(a => 
                         (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
-                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer)
+                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
+                        (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
                     );
                     
                     let total = 0;
@@ -1551,22 +1552,23 @@
                     Object.keys(dayCatTotals).forEach(cat => { breakdown.push({ category: cat, cost: dayCatTotals[cat], color: CATEGORY_COLORS[cat] || PALETTE[Math.floor(Math.random() * PALETTE.length)] }); });
                     return { date, total, breakdown };
                 });
-            }, [tripData, expenseFilterDate, expenseFilterPayer]); // 加入 expenseFilterPayer 依賴
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
 
             const sortedExpensesByDate = useMemo(() => {
                 if (!tripData) return [];
                 const dates = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
                 const expenseList = [];
                 dates.forEach(date => {
-                    // 針對列表資料，加入付款人篩選
+                    // 針對列表資料，加入付款人與幣別篩選
                     const dayExpenses = (tripData.itinerary?.[date] || []).filter(a => 
                         (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
-                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer)
+                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
+                        (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
                     );
                     if (dayExpenses.length > 0) { expenseList.push({ date, items: dayExpenses }); }
                 });
                 return expenseList;
-            }, [tripData, expenseFilterDate, expenseFilterPayer]); // 加入 expenseFilterPayer 依賴
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
 
             const sortedActivities = useMemo(() => {
                 const acts = tripData?.itinerary?.[selectedDate] || [];
@@ -1785,6 +1787,23 @@
                                                                         <option value="all">全部日期</option>
                                                                         {getDatesArray(tripData.startDate, tripData.endDate).map(date => (
                                                                             <option key={date} value={date}>{date}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                                                        <ChevronDown size={12} />
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 幣別篩選 */}
+                                                                <div className="relative flex-1">
+                                                                    <select 
+                                                                        value={expenseFilterCurrency} 
+                                                                        onChange={(e) => setExpenseFilterCurrency(e.target.value)} 
+                                                                        className="w-full appearance-none pl-3 pr-8 py-2 bg-[#E2E2E2] border border-gray-200 text-gray-700 text-xs font-bold rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-[#0ABAB5] cursor-pointer"
+                                                                    >
+                                                                        <option value="all">所有幣別</option>
+                                                                        {currencies.map(c => (
+                                                                            <option key={c.value} value={c.value}>{c.value}</option>
                                                                         ))}
                                                                     </select>
                                                                     <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
