@@ -168,7 +168,7 @@
         };
 
         // --- New Landing Page (Firebase Setup & Quick Join) ---
-        const LandingView = ({ onConnect, onOffline, joinId, setJoinId, onJoin, recentTrips, onDeleteTrip }) => {
+        const LandingView = ({ onConnect, onOffline, joinId, setJoinId, onJoin, recentTrips, onDeleteTrip, isOffline }) => {
             const [configInput, setConfigInput] = useState('');
             const [imgbbKey, setImgbbKey] = useState(''); // New state for Imgbb Key
             const [testStatus, setTestStatus] = useState('idle');
@@ -280,6 +280,15 @@
                 }
             };
 
+            const handleJoinClick = () => {
+                // 防呆機制：如果使用者填寫了設定檔，但還是離線狀態（代表沒存檔），且本地沒有設定檔
+                if (isOffline && configInput.trim().length > 10 && !localStorage.getItem('gtp_firebase_config')) {
+                    alert("您已填寫 Firebase 設定，但尚未建立連線！\n\n請先點擊上方的「測試連線」確認無誤後，務必點擊「儲存連線」按鈕，才能讀取雲端行程。");
+                    return;
+                }
+                onJoin();
+            };
+
             return (
                 <div className="flex flex-col h-full bg-[#F5FDFC] overflow-y-auto no-scrollbar">
                     <div className="flex-1 flex flex-col p-8 max-w-md mx-auto w-full">
@@ -362,7 +371,7 @@
                                         className="flex-1 p-2 bg-[#E2E2E2] border border-gray-200 rounded-lg text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-sm" 
                                     />
                                     <button 
-                                        onClick={onJoin} 
+                                        onClick={handleJoinClick} 
                                         className="bg-gray-800 text-white px-4 rounded-lg font-bold hover:bg-gray-700 transition-all text-sm whitespace-nowrap"
                                     >
                                         讀取
@@ -748,90 +757,121 @@
         };
 
         const AccommodationCard = ({ date, data, onUpdate, onPhotoUpload, onPhotoDelete, onViewImage, onAdd, onDelete, isOwner, currentMember }) => {
+            const [expandedId, setExpandedId] = useState(null);
+
             return (
                 <div className="bg-[#FFF9C4] border border-yellow-300 shadow-sm rounded-2xl p-3 mt-6 relative">
                     {isOwner && <button onClick={onAdd} className="absolute top-3 right-3 bg-yellow-200 text-yellow-700 rounded-full p-1 hover:bg-yellow-300 transition-colors z-10"><Plus size={16} /></button>}
-                    {(data || []).map((item, index) => (
-                        <div key={item.id || index} className={index > 0 ? "border-t border-yellow-200 pt-4 mt-4" : ""}>
-                            <div className="flex items-center justify-start mb-2 gap-2 pr-8">
-                               <BedDouble size={18} className="text-gray-600 flex-shrink-0" />
-                               <AutoSaveInput type="text" readOnly={!isOwner} placeholder="輸入飯店名稱..." value={item.name} onSave={(val) => onUpdate(item.id, 'name', val)} className="flex-1 bg-transparent text-lg font-bold text-gray-800 outline-none placeholder-gray-400"/>
-                               {isOwner && <button onClick={() => onDelete(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>}
-                            </div>
-                            
-                            {/* New Layout: Left Col (Booking/Note) | Right Col (Check-in/Check-out Boxes) */}
-                            <div className="flex gap-2 mb-2">
-                                {/* Left Column */}
-                                <div className="flex-1 flex flex-col gap-2 min-w-0 justify-center">
-                                    <div className="pl-1">
-                                        <AutoSaveInput type="text" readOnly={!isOwner} placeholder="訂房編號" value={item.bookingCode} onSave={(val) => onUpdate(item.id, 'bookingCode', val)} className="text-xs text-gray-500 bg-transparent outline-none w-full"/>
+                    
+                    {(!data || data.length === 0) && <div className="text-center text-yellow-600 text-xs py-2">尚未新增住宿</div>}
+
+                    {(data || []).map((item, index) => {
+                        const isExpanded = expandedId === item.id;
+                        return (
+                            <div key={item.id || index} className={index > 0 ? "border-t border-yellow-200 pt-2 mt-2" : ""}>
+                                {/* Header - Always Visible */}
+                                <div 
+                                    className="flex items-center justify-between cursor-pointer py-1" 
+                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                                >
+                                    <div className="flex items-center gap-2 flex-1 min-w-0 pr-8">
+                                        <BedDouble size={18} className="text-gray-600 flex-shrink-0" />
+                                        <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
+                                            <AutoSaveInput 
+                                                type="text" 
+                                                readOnly={!isOwner} 
+                                                placeholder="輸入飯店名稱..." 
+                                                value={item.name} 
+                                                onSave={(val) => onUpdate(item.id, 'name', val)} 
+                                                className="bg-transparent text-lg font-bold text-gray-800 outline-none placeholder-gray-400 w-full"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="pl-1">
-                                        <AutoSaveInput type="text" readOnly={!isOwner} placeholder="備註 (Wifi/密碼...)" value={item.note} onSave={(val) => onUpdate(item.id, 'note', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1"/>
+                                    <div className="flex items-center gap-2">
+                                        {isOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={16} /></button>}
+                                        <ChevronDown size={20} className={`text-yellow-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                                     </div>
                                 </div>
+                                
+                                {/* Details - Collapsible */}
+                                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                                    <div className="pt-2 pb-1 space-y-2">
+                                        {/* New Layout: Left Col (Booking/Note) | Right Col (Check-in/Check-out Boxes) */}
+                                        <div className="flex gap-2 mb-2">
+                                            {/* Left Column */}
+                                            <div className="flex-1 flex flex-col gap-2 min-w-0 justify-center">
+                                                <div className="pl-1">
+                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="訂房編號" value={item.bookingCode} onSave={(val) => onUpdate(item.id, 'bookingCode', val)} className="text-xs text-gray-500 bg-transparent outline-none w-full"/>
+                                                </div>
+                                                <div className="pl-1">
+                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="備註 (Wifi/密碼...)" value={item.note} onSave={(val) => onUpdate(item.id, 'note', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1"/>
+                                                </div>
+                                            </div>
 
-                                {/* Right Column */}
-                                {/* Modified: Increased width from w-[36%] to w-[40%] to prevent date cutoff */}
-                                <div className="w-[40%] flex flex-col gap-2">
-                                    {/* Check-in Box */}
-                                    <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-1 rounded-lg">
-                                        <LogIn size={12} className="text-green-600 flex-shrink-0" />
-                                        <input 
-                                            type="date" 
-                                            value={item.checkInDate || ''} 
-                                            onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
-                                            disabled={!isOwner} 
-                                            // Modified: Increased font size from text-[10px] to text-xs
-                                            className="text-xs bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
-                                        />
-                                        <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
-                                        {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                        <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-xs bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                                    </div>
+                                            {/* Right Column */}
+                                            {/* Modified: Increased width from w-[36%] to w-[40%] to prevent date cutoff */}
+                                            <div className="w-[40%] flex flex-col gap-2">
+                                                {/* Check-in Box */}
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-1 rounded-lg">
+                                                    <LogIn size={12} className="text-green-600 flex-shrink-0" />
+                                                    <input 
+                                                        type="date" 
+                                                        value={item.checkInDate || ''} 
+                                                        onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
+                                                        disabled={!isOwner} 
+                                                        // Modified: Increased font size from text-[10px] to text-xs
+                                                        className="text-xs bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
+                                                    />
+                                                    <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
+                                                    {/* Modified: Increased font size from text-[10px] to text-xs */}
+                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-xs bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                </div>
 
-                                    {/* Check-out Box */}
-                                    <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-1 rounded-lg">
-                                        <LogOutIcon size={12} className="text-red-500 flex-shrink-0" />
-                                        <input 
-                                            type="date" 
-                                            value={item.checkOutDate || ''} 
-                                            onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} 
-                                            disabled={!isOwner} 
-                                            // Modified: Increased font size from text-[10px] to text-xs
-                                            className="text-xs bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
-                                        />
-                                        <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
-                                        {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                        <select value={item.checkOutTime || '11:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-xs bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                {/* Check-out Box */}
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-1 rounded-lg">
+                                                    <LogOutIcon size={12} className="text-red-500 flex-shrink-0" />
+                                                    <input 
+                                                        type="date" 
+                                                        value={item.checkOutDate || ''} 
+                                                        onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} 
+                                                        disabled={!isOwner} 
+                                                        // Modified: Increased font size from text-[10px] to text-xs
+                                                        className="text-xs bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
+                                                    />
+                                                    <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
+                                                    {/* Modified: Increased font size from text-[10px] to text-xs */}
+                                                    <select value={item.checkOutTime || '11:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-xs bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col gap-2">
+                                        <div className="flex gap-2 items-stretch">
+                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-1 rounded-lg flex-[3] overflow-hidden">
+                                                <Phone size={12} className="text-green-600 flex-shrink-0" />
+                                                <AutoSaveInput type="text" readOnly={!isOwner} placeholder="電話" value={item.phone} onSave={(val) => onUpdate(item.id, 'phone', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
+                                            </div>
+                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-1 rounded-lg flex-[7] overflow-hidden">
+                                                <MapPin size={12} className="text-red-500 flex-shrink-0" />
+                                                <AutoSaveInput type="text" readOnly={!isOwner} placeholder="地址" value={item.address} onSave={(val) => onUpdate(item.id, 'address', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
+                                                <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={12} /></button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-1">
+                                                {item.photoUrls?.map((p, i) => {
+                                                    const url = typeof p === 'string' ? p : p.url;
+                                                    const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
+                                                    const canDelete = isOwner || (currentMember && uploader === currentMember.name);
+                                                    return ( <div key={i} className="relative flex-shrink-0"> <img src={url} className="w-10 h-10 object-cover rounded-lg border border-yellow-200 cursor-zoom-in" onClick={() => onViewImage(url)} /> {canDelete && <button onClick={() => onPhotoDelete(item.id, url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"><X size={10} /></button>} </div> );
+                                                })}
+                                                <button onClick={() => onPhotoUpload(item.id)} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
+                                        </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div className="flex flex-col gap-2">
-                               <div className="flex gap-2 items-stretch">
-                                  <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-1 rounded-lg flex-[3] overflow-hidden">
-                                      <Phone size={12} className="text-green-600 flex-shrink-0" />
-                                      <AutoSaveInput type="text" readOnly={!isOwner} placeholder="電話" value={item.phone} onSave={(val) => onUpdate(item.id, 'phone', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
-                                  </div>
-                                  <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-1 rounded-lg flex-[7] overflow-hidden">
-                                       <MapPin size={12} className="text-red-500 flex-shrink-0" />
-                                       <AutoSaveInput type="text" readOnly={!isOwner} placeholder="地址" value={item.address} onSave={(val) => onUpdate(item.id, 'address', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
-                                       <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={12} /></button>
-                                  </div>
-                               </div>
-                               <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-1">
-                                    {item.photoUrls?.map((p, i) => {
-                                        const url = typeof p === 'string' ? p : p.url;
-                                        const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
-                                        const canDelete = isOwner || (currentMember && uploader === currentMember.name);
-                                        return ( <div key={i} className="relative flex-shrink-0"> <img src={url} className="w-10 h-10 object-cover rounded-lg border border-yellow-200 cursor-zoom-in" onClick={() => onViewImage(url)} /> {canDelete && <button onClick={() => onPhotoDelete(item.id, url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"><X size={10} /></button>} </div> );
-                                    })}
-                                    <button onClick={() => onPhotoUpload(item.id)} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
-                               </div>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             );
         };
@@ -1593,7 +1633,7 @@
                     if (hasConfig) {
                         alert("找不到本機資料，且目前尚未成功連線至雲端。\n\n請檢查網路，或點擊上方「測試連線」確認設定是否正確。");
                     } else {
-                        alert("找不到本機資料。\n\n若這是一個雲端行程 ID，請先填寫上方的 Firebase 設定並進行連線。");
+                        alert("找不到本機資料。\n\n若這是一個雲端行程 ID，請先在上方填寫 Firebase 設定，並務必點擊「儲存連線」按鈕以啟用雲端功能。");
                     }
                 } else {
                     // 3. Online: Try to fetch from cloud (via useEffect)
@@ -1890,6 +1930,7 @@
                                     onJoin={(arg) => handleLocalJoin(typeof arg === 'string' ? arg : null)}
                                     recentTrips={recentTrips}
                                     onDeleteTrip={handleDeleteTrip}
+                                    isOffline={isOffline}
                                 />
                             ) : (
                                 <>
