@@ -1573,7 +1573,7 @@
                 updateTrip('itinerary', newItinerary);
                 setModals(m => ({ ...m, expense: false }));
                 setEditingExpense(null);
-                setView('expense');
+                // setView('expense'); // Removed to stay on current view
             };
             
             const deleteActivity = (id) => {
