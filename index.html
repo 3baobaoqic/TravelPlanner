@@ -1011,25 +1011,25 @@
                             {/* Cost & Expense Section */}
                             <div className="border-t border-[#eeeeee] pt-2">
                                 <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">費用與記帳</span></div>
-                                <div className="flex gap-2 mb-2">
-                                    <div className="flex-1 flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee]">
-                                        <span className="text-xs text-gray-400">$</span>
-                                        <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額 (選填)" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700" />
-                                    </div>
-                                    <div className="w-[30%]">
-                                        <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select>
-                                    </div>
-                                </div>
-                                
-                                {/* Auto-expand category and payer if cost is entered */}
-                                {hasCost && (
-                                    <div className="grid grid-cols-2 gap-2 mb-2 animate-fadeIn">
+                                <div className="flex gap-2 mb-2 items-start">
+                                    <div className="flex-1 flex flex-col gap-2">
+                                        <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee]">
+                                            <span className="text-xs text-gray-400">$</span>
+                                            <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額 (選填)" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700" />
+                                        </div>
+                                        
+                                        {/* Category - Fixed Display */}
                                         <div>
                                             <label className="text-[10px] text-gray-400 font-bold block mb-1">分類</label>
                                             <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs font-bold text-gray-700 border border-[#eeeeee]">
                                                 {(tripData.expenseCategories || []).map(c=><option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
+                                    </div>
+                                    <div className="w-[35%] flex flex-col gap-2">
+                                        <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select>
+                                        
+                                        {/* Payer - Fixed Display */}
                                         <div>
                                             <label className="text-[10px] text-gray-400 font-bold block mb-1">付款人</label>
                                             <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs font-bold text-gray-700 border border-[#eeeeee]">
@@ -1037,7 +1037,7 @@
                                             </select>
                                         </div>
                                     </div>
-                                )}
+                                </div>
 
                                 <div className="mt-2">
                                     <input value={formData.bookingCode} onChange={e=>setFormData({...formData, bookingCode:e.target.value})} placeholder="訂位/票券代碼 (選填)" className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee]" />
