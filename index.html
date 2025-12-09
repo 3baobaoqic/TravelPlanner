@@ -50,7 +50,8 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle } from 'lucide-react';
+        // Modified: Added 'Info' to imports
+        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
@@ -120,6 +121,24 @@
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
         };
 
+        // New: Info Popup Component
+        const InfoPopup = ({ isOpen, onClose, title, content }) => !isOpen ? null : (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
+                <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative z-10 shadow-xl animate-[fadeIn_0.2s_ease-out]">
+                    <h3 className="text-lg font-bold text-[#0ABAB5] mb-3 flex items-center gap-2">
+                        <Info size={20} /> {title}
+                    </h3>
+                    <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                        {content}
+                    </div>
+                    <button onClick={onClose} className="mt-6 w-full py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors">
+                        了解
+                    </button>
+                </div>
+            </div>
+        );
+
         // Unified Image Upload Helper
         const processImageUpload = async (file) => {
             const b64 = await resizeImage(file);
@@ -156,6 +175,7 @@
             const [testStatus, setTestStatus] = useState('idle');
             const [errorMessage, setErrorMessage] = useState('');
             const [successMessage, setSuccessMessage] = useState(''); // New state for specific success message
+            const [infoType, setInfoType] = useState(null); // New state for Info Modal
 
             useEffect(() => {
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
@@ -270,7 +290,12 @@
                         </div>
 
                         <div className="bg-gray-100 p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">Firebase Configuration</label>
+                            {/* Modified: Added Info Icon */}
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Firebase Configuration</label>
+                                <button onClick={() => setInfoType('firebase')} className="text-gray-400 hover:text-[#0ABAB5] transition-colors"><Info size={16} /></button>
+                            </div>
+                            
                             {/* Height reduced to h-12 as requested */}
                             <textarea 
                                 value={configInput}
@@ -279,8 +304,11 @@
                                 placeholder={`apiKey: "...",\nprojectId: "..."`}
                             />
 
-                            {/* New Imgbb API Key Input */}
-                            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">Imgbb API Key (選填 - 解鎖無限圖片)</label>
+                            {/* Modified: Added Info Icon */}
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Imgbb API Key (選填)</label>
+                                <button onClick={() => setInfoType('imgbb')} className="text-gray-400 hover:text-[#0ABAB5] transition-colors"><Info size={16} /></button>
+                            </div>
                             <input 
                                 value={imgbbKey}
                                 onChange={(e) => setImgbbKey(e.target.value)}
@@ -323,6 +351,7 @@
 
                         {/* --- JOIN TRIP SECTION (MOVED FROM SETUP) --- */}
                         <div className="border-t border-gray-200 pt-6">
+                            {/* Deleted "快速讀取" header */}
                             
                             <div className="bg-gray-100 border border-gray-100 rounded-xl p-3 mb-4 shadow-sm">
                                 <label className="text-xs font-bold text-gray-400 block mb-2">輸入旅程 ID</label>
@@ -369,6 +398,20 @@
                             )}
                         </div>
                     </div>
+
+                    {/* Info Modals */}
+                    <InfoPopup 
+                        isOpen={infoType === 'firebase'} 
+                        onClose={() => setInfoType(null)} 
+                        title="如何取得 Firebase 設定"
+                        content={`1. 前往 Firebase Console (console.firebase.google.com)\n2. 建立新專案或選擇現有專案\n3. 點擊 "Project Settings" (專案設定)\n4. 滑動至下方的 "Your apps" 區塊\n5. 選擇 "Config" 選項\n6. 複製 const firebaseConfig = {...} 大括號內的所有內容並貼上。`}
+                    />
+                    <InfoPopup 
+                        isOpen={infoType === 'imgbb'} 
+                        onClose={() => setInfoType(null)} 
+                        title="如何取得 Imgbb API Key"
+                        content={`1. 前往 api.imgbb.com\n2. 註冊或登入您的帳號\n3. 點擊 "Get API Key" 按鈕\n4. 複製產生的 Key 並貼上\n\n💡 設定此項可將圖片上傳至 Imgbb 圖床，解決 Firebase Firestore 的 1MB 儲存限制，讓您可以上傳更多、更清晰的照片。`}
+                    />
                 </div>
             );
         };
@@ -1715,7 +1758,7 @@
                                             {/* Content Area - Only Create Mode Now */}
                                             <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
                                                 <div className="space-y-4">
-                                                    <h3 className="text-lg font-bold text-gray-700 mb-2">建立新旅程</h3>
+                                                    {/* Header "建立新旅程" removed here */}
                                                     <div className="space-y-3 p-1">
                                                         <input placeholder="目的地" value={setupForm.destination} onChange={e=>setSetupForm({...setupForm, destination:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
                                                         <div className="flex gap-2">
