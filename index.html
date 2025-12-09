@@ -2312,8 +2312,55 @@
                                                             </div>
                                                         </div>
                                                         
-                                                        {/* Inserted Transaction List Here */}
+                                                        {/* Modified: Statistics Section Moved to Top */}
+                                                        {expenseStatsByCurrency.length === 0 && sortedExpensesByDate.length > 0 ? (
+                                                            <div className="text-center text-gray-400 text-xs mt-4">無統計數據</div>
+                                                        ) : (
+                                                            expenseStatsByCurrency.map(stat => (
+                                                                <div key={stat.currency} className="space-y-4 pt-4 mt-4 border-t-2 border-dashed border-gray-200 first:border-0 first:mt-0 first:pt-0">
+                                                                    <div className="flex items-center gap-2 px-1 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+                                                                        <div className={`h-6 w-1.5 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
+                                                                        <h4 className="font-bold text-gray-800 text-lg flex-1">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
+                                                                    </div>
+                                                                    
+                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
+                                                                        <SimplePieChart data={stat.pieData} />
+                                                                        
+                                                                        {/* New: Category Breakdown List */}
+                                                                        <div className="mt-6 space-y-2">
+                                                                            {stat.pieData.map(item => (
+                                                                                <div key={item.category} className="flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
+                                                                                        <span className="text-gray-600 font-medium">{item.category}</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="text-gray-400 text-[10px]">({Math.round((item.value / stat.total) * 100)}%)</span>
+                                                                                        <span className="font-bold text-gray-700 text-sm">${item.value.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
+                                                                        <SimpleBarChart data={stat.barData} />
+                                                                    </div>
+
+                                                                    {/* Total Expense */}
+                                                                    <div className="bg-[#FFF3E0] p-4 rounded-xl border border-[#FFE0B2] flex justify-between items-center shadow-sm">
+                                                                        <span className="font-bold text-[#D68C68] text-sm">總支出 ({stat.currency})</span>
+                                                                        <span className="font-bold text-[#D68C68] text-2xl">${stat.total.toLocaleString()}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        )}
+
+                                                        {/* Modified: Transaction List Moved to Bottom */}
                                                         <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee] shadow-sm">
+                                                            <div className="mb-2 text-xs font-bold text-gray-400">詳細列表</div>
                                                             {sortedExpensesByDate.length === 0 ? (
                                                                 <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-xl">尚無消費紀錄</div>
                                                             ) : (
@@ -2360,52 +2407,6 @@
                                                                 </div>
                                                             )}
                                                         </div>
-
-                                                        {/* Modified: Map through expenseStatsByCurrency to render charts vertically per currency */}
-                                                        {expenseStatsByCurrency.length === 0 && sortedExpensesByDate.length > 0 ? (
-                                                            <div className="text-center text-gray-400 text-xs mt-4">無統計數據</div>
-                                                        ) : (
-                                                            expenseStatsByCurrency.map(stat => (
-                                                                <div key={stat.currency} className="space-y-4 pt-4 mt-4 border-t-2 border-dashed border-gray-200 first:border-0 first:mt-0 first:pt-0">
-                                                                    <div className="flex items-center gap-2 px-1 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
-                                                                        <div className={`h-6 w-1.5 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
-                                                                        <h4 className="font-bold text-gray-800 text-lg flex-1">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
-                                                                    </div>
-                                                                    
-                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
-                                                                        <SimplePieChart data={stat.pieData} />
-                                                                        
-                                                                        {/* New: Category Breakdown List */}
-                                                                        <div className="mt-6 space-y-2">
-                                                                            {stat.pieData.map(item => (
-                                                                                <div key={item.category} className="flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
-                                                                                        <span className="text-gray-600 font-medium">{item.category}</span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-gray-400 text-[10px]">({Math.round((item.value / stat.total) * 100)}%)</span>
-                                                                                        <span className="font-bold text-gray-700 text-sm">${item.value.toLocaleString()}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
-                                                                        <SimpleBarChart data={stat.barData} />
-                                                                    </div>
-
-                                                                    {/* Total Expense Moved to Bottom */}
-                                                                    <div className="bg-[#FFF3E0] p-4 rounded-xl border border-[#FFE0B2] flex justify-between items-center shadow-sm">
-                                                                        <span className="font-bold text-[#D68C68] text-sm">總支出 ({stat.currency})</span>
-                                                                        <span className="font-bold text-[#D68C68] text-2xl">${stat.total.toLocaleString()}</span>
-                                                                    </div>
-                                                                </div>
-                                                            ))
-                                                        )}
                                                     </div>
                                                 )}
                                             </div>
