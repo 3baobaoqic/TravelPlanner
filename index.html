@@ -1382,7 +1382,7 @@
                 if (isOffline) {
                     const localData = localStorage.getItem(`gtp_trip_${tripId}`);
                     if (localData) {
-                        const d = JSON.parse(localData);
+                        const d = processLoadedData(JSON.parse(localData));
                         setTripData(d);
                         
                         if(!selectedDate) setSelectedDate(d.startDate);
@@ -1399,6 +1399,13 @@
                                  setSelectedDate(d.startDate);
                             }
                         }
+
+                        // 新增：讀取成功後，更新近期紀錄 (Fix: Update recent trips in offline mode)
+                        setRecentTrips(p => { 
+                            const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
+                            localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
+                            return newRecents; 
+                        });
                     }
                 } else {
                     // 2. If Online, load from Firestore
