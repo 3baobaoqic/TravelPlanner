@@ -168,7 +168,7 @@
         };
 
         // --- New Landing Page (Firebase Setup & Quick Join) ---
-        const LandingView = ({ onConnect, onOffline, joinId, setJoinId, onJoin, recentTrips, onDeleteTrip, isOffline }) => {
+        const LandingView = ({ onConnect, onOffline, joinId, setJoinId, onJoin, recentTrips, onDeleteTrip, isOffline, onCreateTrip }) => {
             const [configInput, setConfigInput] = useState('');
             const [imgbbKey, setImgbbKey] = useState(''); // New state for Imgbb Key
             const [testStatus, setTestStatus] = useState('idle');
@@ -190,7 +190,13 @@
                 if (storedImgbb) {
                     setImgbbKey(storedImgbb);
                 }
-            }, []);
+
+                // 自動偵測：如果已經連線(非離線模式)，直接顯示成功狀態
+                if (!isOffline) {
+                    setTestStatus('success');
+                    setSuccessMessage('目前已連線');
+                }
+            }, [isOffline]);
 
             const parseConfig = (str) => {
                 try {
@@ -257,12 +263,19 @@
                         }
                     }
 
+                    // --- 自動儲存並連線 (Auto Save & Connect) ---
+                    localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
+                    localStorage.setItem('gtp_imgbb_key', imgbbKey.trim());
+                    
                     setTestStatus('success');
                     if (imgbbVerified) {
-                        setSuccessMessage('雙平台皆連線成功');
+                        setSuccessMessage('連線成功！設定已儲存');
                     } else {
-                        setSuccessMessage('Firebase 連線成功 (未設定 Imgbb)');
+                        setSuccessMessage('連線成功 (未設定 Imgbb)');
                     }
+                    
+                    // 立即觸發 App 連線
+                    onConnect(config);
 
                 } catch (e) {
                     console.error("Test failed", e);
@@ -271,14 +284,7 @@
                 }
             };
 
-            const handleSave = () => {
-                const config = parseConfig(configInput);
-                if (config) {
-                    localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
-                    localStorage.setItem('gtp_imgbb_key', imgbbKey.trim()); // Save Imgbb Key
-                    onConnect(config);
-                }
-            };
+            // handleSave 移除，功能合併至 handleTestConnection
 
             const handleJoinClick = () => {
                 const cleanId = (joinId || '').trim();
@@ -288,15 +294,9 @@
                     return;
                 }
 
-                // 防呆機制 1: 已經測試成功，但還沒儲存 (最常見的情況)
-                if (isOffline && testStatus === 'success') {
-                    alert("您已測試連線成功，但尚未儲存！\n\n請務必點擊下方的「儲存連線」按鈕，直到出現綠色 Wifi 圖示，系統才能讀取雲端行程。");
-                    return;
-                }
-
-                // 防呆機制 2: 填寫了設定檔，但完全沒動作
+                // 防呆機制：如果使用者填寫了設定檔，但還是離線狀態（代表沒存檔），且本地沒有設定檔
                 if (isOffline && configInput.trim().length > 10 && !localStorage.getItem('gtp_firebase_config')) {
-                    alert("您已填寫 Firebase 設定，但尚未建立連線！\n\n請先點擊上方的「測試連線」確認無誤後，再點擊「儲存連線」按鈕。");
+                    alert("您已填寫 Firebase 設定，但尚未建立連線！\n\n請先點擊上方的「測試連線」，系統會自動儲存並建立連線。");
                     return;
                 }
                 
@@ -322,7 +322,7 @@
                             {/* Height reduced to h-12 as requested */}
                             <textarea 
                                 value={configInput}
-                                onChange={(e) => setConfigInput(e.target.value)}
+                                onChange={(e) => { setConfigInput(e.target.value); setTestStatus('idle'); }}
                                 className="w-full h-12 p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none focus:border-[#0ABAB5] focus:ring-1 focus:ring-[#0ABAB5] resize-none mb-4 placeholder-gray-500 text-gray-700"
                                 placeholder={`apiKey: "...",\nprojectId: "..."`}
                             />
@@ -334,7 +334,7 @@
                             </div>
                             <input 
                                 value={imgbbKey}
-                                onChange={(e) => setImgbbKey(e.target.value)}
+                                onChange={(e) => { setImgbbKey(e.target.value); setTestStatus('idle'); }}
                                 className="w-full p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none focus:border-[#0ABAB5] focus:ring-1 focus:ring-[#0ABAB5] mb-4 placeholder-gray-500 text-gray-700"
                                 placeholder="例如: 358e4c7980312..."
                             />
@@ -356,12 +356,12 @@
 
                         <div className="flex gap-2 w-full mb-8">
                             <button 
-                                onClick={handleSave}
+                                onClick={onCreateTrip}
                                 disabled={testStatus !== 'success'}
                                 className={`flex-1 py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 text-sm
                                     ${testStatus === 'success' ? 'bg-[#0ABAB5] hover:bg-[#008985]' : 'bg-gray-300 cursor-not-allowed'}`}
                             >
-                                <Wifi size={18} /> 儲存連線
+                                <Plus size={18} /> 建立雲端新旅程
                             </button>
 
                             <button 
@@ -2061,8 +2061,9 @@
                         <>
                             {view === 'landing' ? (
                                 <LandingView 
-                                    onConnect={(config) => handleConfigUpdate(config).then(() => setView('setup'))}
+                                    onConnect={(config) => handleConfigUpdate(config)}
                                     onOffline={() => handleConfigUpdate(null).then(() => setView('setup'))}
+                                    onCreateTrip={() => setView('setup')}
                                     joinId={joinId}
                                     setJoinId={setJoinId}
                                     onJoin={(arg) => handleLocalJoin(typeof arg === 'string' ? arg : null)}
