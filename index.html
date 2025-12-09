@@ -1705,6 +1705,9 @@
                 
                 if (!idToJoin) return;
                 
+                // 【修復白屏關鍵】切換 ID 時先清空舊資料，避免渲染錯誤或殘留
+                setTripData(null); 
+
                 // 1. Always check local storage first (fastest)
                 const localData = localStorage.getItem(`gtp_trip_${idToJoin}`);
                 if (localData) {
