@@ -281,12 +281,21 @@
             };
 
             const handleJoinClick = () => {
+                const cleanId = (joinId || '').trim();
+
+                if (!cleanId) {
+                    alert("請輸入旅程 ID");
+                    return;
+                }
+
                 // 防呆機制：如果使用者填寫了設定檔，但還是離線狀態（代表沒存檔），且本地沒有設定檔
                 if (isOffline && configInput.trim().length > 10 && !localStorage.getItem('gtp_firebase_config')) {
                     alert("您已填寫 Firebase 設定，但尚未建立連線！\n\n請先點擊上方的「測試連線」確認無誤後，務必點擊「儲存連線」按鈕，才能讀取雲端行程。");
                     return;
                 }
-                onJoin();
+                
+                // 傳遞處理過的 ID
+                onJoin(cleanId);
             };
 
             return (
@@ -368,6 +377,7 @@
                                         placeholder="例如：x9z8y7" 
                                         value={joinId} 
                                         onChange={e => setJoinId(e.target.value)} 
+                                        onKeyDown={(e) => e.key === 'Enter' && handleJoinClick()}
                                         className="flex-1 p-2 bg-[#E2E2E2] border border-gray-200 rounded-lg text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-sm" 
                                     />
                                     <button 
@@ -923,17 +933,43 @@
             );
         };
 
-        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues }) => {
-            const [formData, setFormData] = useState({ time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: 'JPY', payer: '我', photoUrls: [] });
+        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues, currentMember }) => {
+            const [formData, setFormData] = useState({ time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: 'JPY', payer: '我', category: '', photoUrls: [] });
             const [confirm, setConfirm] = useState({ open: false, idx: null });
             const fileRef = useRef(null);
             
-            // ... (useEffect logic remains the same)
             useEffect(() => {
                  if (isOpen) {
-                     if (defaultValues) { setFormData(defaultValues); } else { setFormData({ time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: tripData?.currency || 'JPY', payer: tripData?.members?.[0]?.name || '我', photoUrls: [] }); }
+                     if (defaultValues) { 
+                         setFormData({
+                             ...defaultValues,
+                             currency: defaultValues.currency || tripData?.currency || 'JPY',
+                             payer: defaultValues.payer || currentMember?.name || tripData?.members?.[0]?.name || '我',
+                             category: defaultValues.category || ''
+                         }); 
+                     } else { 
+                         setFormData({ 
+                             time: '09:00', title: '', note: '', transport: 'walk', duration: '60', 
+                             bookingCode: '', cost: '', 
+                             currency: tripData?.currency || 'JPY', 
+                             payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
+                             category: '', // Will be auto-set by transport effect
+                             photoUrls: [] 
+                         }); 
+                     }
                  }
-            }, [isOpen, defaultValues, tripData]);
+            }, [isOpen, defaultValues, tripData, currentMember]);
+
+            // Effect: Auto-set category based on transport if category is empty
+            useEffect(() => {
+                if (!formData.category && isOpen && !defaultValues) {
+                    if (['train', 'bus', 'taxi', 'car', 'plane', 'shinkansen', 'nightbus', 'tram'].includes(formData.transport)) {
+                        setFormData(p => ({ ...p, category: '交通' }));
+                    } else {
+                        setFormData(p => ({ ...p, category: '娛樂' }));
+                    }
+                }
+            }, [formData.transport, isOpen, defaultValues]);
 
             if (!isOpen) return null;
             const handleSave = () => { if(!formData.title.trim()) return alert('請輸入名稱'); onSave({...formData, cost: parseFloat(formData.cost)||0}); onClose(); };
@@ -948,6 +984,8 @@
                 e.target.value = ''; 
             };
             
+            const hasCost = formData.cost && parseFloat(formData.cost) > 0;
+
             return (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
                     <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
@@ -963,13 +1001,43 @@
                                 <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">交通</label><select value={formData.transport} onChange={e=>setFormData({...formData, transport:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{transportOptions.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
                                 <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">停留</label><select value={formData.duration} onChange={e=>setFormData({...formData, duration:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{durationOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                             </div>
+                            
+                            {/* Cost & Expense Section */}
                             <div className="border-t border-[#eeeeee] pt-2">
-                                <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">進階選項 (費用/訂位)</span></div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <input value={formData.bookingCode} onChange={e=>setFormData({...formData, bookingCode:e.target.value})} placeholder="訂位代碼" className="bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee]" />
-                                    <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee]"><span className="text-xs text-gray-400">$</span><input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="預算" className="w-full bg-transparent p-2 text-xs outline-none text-gray-700" /></div>
+                                <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">費用與記帳</span></div>
+                                <div className="flex gap-2 mb-2">
+                                    <div className="flex-1 flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee]">
+                                        <span className="text-xs text-gray-400">$</span>
+                                        <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額 (選填)" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700" />
+                                    </div>
+                                    <div className="w-[30%]">
+                                        <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select>
+                                    </div>
+                                </div>
+                                
+                                {/* Auto-expand category and payer if cost is entered */}
+                                {hasCost && (
+                                    <div className="grid grid-cols-2 gap-2 mb-2 animate-fadeIn">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 font-bold block mb-1">分類</label>
+                                            <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs font-bold text-gray-700 border border-[#eeeeee]">
+                                                {(tripData.expenseCategories || []).map(c=><option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 font-bold block mb-1">付款人</label>
+                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs font-bold text-gray-700 border border-[#eeeeee]">
+                                                {tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-2">
+                                    <input value={formData.bookingCode} onChange={e=>setFormData({...formData, bookingCode:e.target.value})} placeholder="訂位/票券代碼 (選填)" className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee]" />
                                 </div>
                             </div>
+
                             <div>
                                 <label className="text-xs text-gray-400 font-bold block mb-2"></label>
                                 <div className="flex gap-2 overflow-x-auto">
@@ -1636,7 +1704,7 @@
                     if (hasConfig) {
                         alert("找不到本機資料，且目前尚未成功連線至雲端。\n\n請檢查網路，或點擊上方「測試連線」確認設定是否正確。");
                     } else {
-                        alert("找不到本機資料。\n\n若這是一個雲端行程 ID，請先在上方填寫 Firebase 設定，並務必點擊「儲存連線」按鈕以啟用雲端功能。");
+                        alert("找不到本機資料。\n\n若這是一個雲端行程 ID，請確認：\n1. 上方 Firebase 設定是否正確\n2. 是否已點擊「儲存連線」按鈕 (需看到綠色 Wifi 燈號)");
                     }
                 } else {
                     // 3. Online: Try to fetch from cloud (via useEffect)
@@ -2322,7 +2390,7 @@
                                                 )}
                                             </div>
 
-                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} />
+                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} />
                                             <ExpenseModal 
                                                 isOpen={modals.expense} 
                                                 onClose={()=> { setModals({...modals, expense:false}); setEditingExpense(null); }} 
