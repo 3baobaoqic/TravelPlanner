@@ -175,6 +175,7 @@
             const [errorMessage, setErrorMessage] = useState('');
             const [successMessage, setSuccessMessage] = useState(''); // New state for specific success message
             const [infoType, setInfoType] = useState(null); // New state for Info Modal
+            const [pendingJoinId, setPendingJoinId] = useState(null); // 新增：等待連線後自動加入的 ID
 
             useEffect(() => {
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
@@ -195,8 +196,14 @@
                 if (!isOffline) {
                     setTestStatus('success');
                     setSuccessMessage('目前已連線');
+                    
+                    // 新增：如果連線成功且有等待加入的 ID，自動執行加入
+                    if (pendingJoinId) {
+                        onJoin(pendingJoinId);
+                        setPendingJoinId(null);
+                    }
                 }
-            }, [isOffline]);
+            }, [isOffline, pendingJoinId, onJoin]);
 
             const parseConfig = (str) => {
                 try {
@@ -292,6 +299,37 @@
                 if (!cleanId) {
                     alert("請輸入旅程 ID");
                     return;
+                }
+
+                // 新增：檢查是否為「一鍵設定懶人包」 (JSON 格式)
+                if (cleanId.startsWith('{') && cleanId.endsWith('}')) {
+                    try {
+                        const bundle = JSON.parse(cleanId);
+                        if (bundle.id && bundle.firebase) {
+                            if (confirm(`偵測到包含 Firebase 設定的旅程代碼 (ID: ${bundle.id})。\n\n是否要自動匯入設定、建立連線並加入旅程？`)) {
+                                // 1. 自動儲存設定
+                                localStorage.setItem('gtp_firebase_config', JSON.stringify(bundle.firebase));
+                                if (bundle.imgbb) localStorage.setItem('gtp_imgbb_key', bundle.imgbb);
+                                
+                                // 2. 更新介面顯示 (讓使用者知道設定變了)
+                                setConfigInput(JSON.stringify(bundle.firebase, null, 2).replace(/[{}]/g, '').trim());
+                                setImgbbKey(bundle.imgbb || '');
+                                
+                                // 3. 設定待加入 ID (等連線成功後 useEffect 會觸發加入)
+                                setPendingJoinId(bundle.id);
+                                setJoinId(bundle.id); // 將輸入框內容改回單純 ID，看起來較整潔
+                                
+                                // 4. 觸發連線
+                                onConnect(bundle.firebase);
+                                
+                                alert("設定已匯入，正在嘗試連線...\n\n連線成功後將自動進入旅程。");
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        console.error("JSON Parse Error", e);
+                        // 解析失敗則繼續往下，當作普通 ID 處理
+                    }
                 }
 
                 // 防呆機制：如果使用者填寫了設定檔，但還是離線狀態（代表沒存檔），且本地沒有設定檔
@@ -776,22 +814,21 @@
             const [expandedId, setExpandedId] = useState(null);
 
             return (
-                <div className="bg-[#FFF9C4] border border-yellow-300 shadow-sm rounded-2xl p-3 mt-6 relative">
-                    {isOwner && <button onClick={onAdd} className="absolute top-3 right-3 bg-yellow-200 text-yellow-700 rounded-full p-1 hover:bg-yellow-300 transition-colors z-10"><Plus size={16} /></button>}
+                <div className="bg-[#FFF9C4] border border-yellow-300 shadow-sm rounded-2xl p-1.5 mt-4 relative mb-2">
                     
-                    {(!data || data.length === 0) && <div className="text-center text-yellow-600 text-xs py-2">尚未新增住宿</div>}
+                    {(!data || data.length === 0) && <div className="text-center text-yellow-600 text-xs py-1">尚未新增住宿</div>}
 
                     {(data || []).map((item, index) => {
                         const isExpanded = expandedId === item.id;
                         return (
-                            <div key={item.id || index} className={index > 0 ? "border-t border-yellow-200 pt-2 mt-2" : ""}>
+                            <div key={item.id || index} className={index > 0 ? "border-t border-yellow-200 pt-0.5 mt-0.5" : ""}>
                                 {/* Header - Always Visible */}
                                 <div 
-                                    className="flex items-center justify-between cursor-pointer py-1" 
+                                    className="flex items-center justify-between cursor-pointer" 
                                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                 >
-                                    <div className="flex items-center gap-2 flex-1 min-w-0 pr-8">
-                                        <BedDouble size={18} className="text-gray-600 flex-shrink-0" />
+                                    <div className="flex items-center gap-1 flex-1 min-w-0 pr-8">
+                                        <BedDouble size={14} className="text-gray-600 flex-shrink-0" />
                                         <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
                                             <AutoSaveInput 
                                                 type="text" 
@@ -799,23 +836,23 @@
                                                 placeholder="輸入飯店名稱..." 
                                                 value={item.name} 
                                                 onSave={(val) => onUpdate(item.id, 'name', val)} 
-                                                className="bg-transparent text-lg font-bold text-gray-800 outline-none placeholder-gray-400 w-full"
+                                                className="bg-transparent text-xs font-bold text-gray-800 outline-none placeholder-gray-400 w-full leading-none"
                                             />
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {isOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={16} /></button>}
-                                        <ChevronDown size={20} className={`text-yellow-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                    <div className="flex items-center gap-1">
+                                        {isOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="text-red-400 hover:text-red-600 p-0.5"><Trash2 size={12} /></button>}
+                                        <ChevronDown size={14} className={`text-yellow-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                                     </div>
                                 </div>
                                 
                                 {/* Details - Collapsible */}
                                 <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                    <div className="pt-2 pb-1 space-y-2">
+                                    <div className="pt-1 pb-0.5 space-y-1">
                                         {/* New Layout: Left Col (Booking/Note) | Right Col (Check-in/Check-out Boxes) */}
-                                        <div className="flex gap-2 mb-2">
+                                        <div className="flex gap-1 mb-1">
                                             {/* Left Column */}
-                                            <div className="flex-1 flex flex-col gap-2 min-w-0 justify-center">
+                                            <div className="flex-1 flex flex-col gap-1 min-w-0 justify-center">
                                                 <div className="pl-1">
                                                     <AutoSaveInput type="text" readOnly={!isOwner} placeholder="訂房編號" value={item.bookingCode} onSave={(val) => onUpdate(item.id, 'bookingCode', val)} className="text-xs text-gray-500 bg-transparent outline-none w-full"/>
                                                 </div>
@@ -826,54 +863,54 @@
 
                                             {/* Right Column */}
                                             {/* Modified: Increased width from w-[36%] to w-[40%] to prevent date cutoff */}
-                                            <div className="w-[40%] flex flex-col gap-2">
+                                            <div className="w-[40%] flex flex-col gap-1">
                                                 {/* Check-in Box */}
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-1 rounded-lg">
-                                                    <LogIn size={12} className="text-green-600 flex-shrink-0" />
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
+                                                    <LogIn size={10} className="text-green-600 flex-shrink-0" />
                                                     <input 
                                                         type="date" 
                                                         value={item.checkInDate || ''} 
                                                         onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
                                                         disabled={!isOwner} 
                                                         // Modified: Increased font size from text-[10px] to text-xs
-                                                        className="text-xs bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
+                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
                                                     />
-                                                    <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
+                                                    <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
                                                     {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-xs bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                                                 </div>
 
                                                 {/* Check-out Box */}
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-1 rounded-lg">
-                                                    <LogOutIcon size={12} className="text-red-500 flex-shrink-0" />
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
+                                                    <LogOutIcon size={10} className="text-red-500 flex-shrink-0" />
                                                     <input 
                                                         type="date" 
                                                         value={item.checkOutDate || ''} 
                                                         onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} 
                                                         disabled={!isOwner} 
                                                         // Modified: Increased font size from text-[10px] to text-xs
-                                                        className="text-xs bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
+                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
                                                     />
-                                                    <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
+                                                    <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
                                                     {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                                    <select value={item.checkOutTime || '11:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-xs bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                    <select value={item.checkOutTime || '11:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                                                 </div>
                                             </div>
                                         </div>
                                         
-                                        <div className="flex flex-col gap-2">
+                                        <div className="flex flex-col gap-1">
                                         <div className="flex gap-2 items-stretch">
-                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-1 rounded-lg flex-[3] overflow-hidden">
-                                                <Phone size={12} className="text-green-600 flex-shrink-0" />
+                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[3] overflow-hidden">
+                                                <Phone size={10} className="text-green-600 flex-shrink-0" />
                                                 <AutoSaveInput type="text" readOnly={!isOwner} placeholder="電話" value={item.phone} onSave={(val) => onUpdate(item.id, 'phone', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
                                             </div>
-                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-1 rounded-lg flex-[7] overflow-hidden">
-                                                <MapPin size={12} className="text-red-500 flex-shrink-0" />
+                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[7] overflow-hidden">
+                                                <MapPin size={10} className="text-red-500 flex-shrink-0" />
                                                 <AutoSaveInput type="text" readOnly={!isOwner} placeholder="地址" value={item.address} onSave={(val) => onUpdate(item.id, 'address', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
-                                                <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={12} /></button>
+                                                <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={10} /></button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-1">
+                                        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-0.5">
                                                 {item.photoUrls?.map((p, i) => {
                                                     const url = typeof p === 'string' ? p : p.url;
                                                     const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
@@ -888,6 +925,9 @@
                             </div>
                         );
                     })}
+
+                    {/* Button Moved to Bottom Right Outside - Adjusted further down */}
+                    {isOwner && <button onClick={onAdd} className="absolute -bottom-5 right-2 bg-yellow-400 text-white shadow-md rounded-full p-1.5 hover:bg-yellow-500 transition-colors z-10 border-2 border-white"><Plus size={14} /></button>}
                 </div>
             );
         };
@@ -1156,8 +1196,37 @@
                         </div>
                         <div className="flex items-center gap-1">
                              <div 
-                                className="w-8 h-8 flex items-center justify-center text-white rounded-full"
-                                title={isOffline ? "目前為離線模式" : "已連線至 Firebase"}
+                                className="w-8 h-8 flex items-center justify-center text-white rounded-full cursor-pointer hover:bg-white/10"
+                                onClick={() => {
+                                    if (isOffline) {
+                                        alert("目前為離線模式，無法產生分享連結。");
+                                    } else {
+                                        // 產生一鍵分享包
+                                        const fbConfigStr = localStorage.getItem('gtp_firebase_config');
+                                        const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key');
+                                        if (fbConfigStr) {
+                                            try {
+                                                const bundle = {
+                                                    id: tripData.id,
+                                                    firebase: JSON.parse(fbConfigStr),
+                                                    imgbb: imgbbKeyStr || ''
+                                                };
+                                                const textToCopy = JSON.stringify(bundle);
+                                                const textArea = document.createElement("textarea");
+                                                textArea.value = textToCopy;
+                                                document.body.appendChild(textArea);
+                                                textArea.select();
+                                                document.execCommand("Copy");
+                                                textArea.remove();
+                                                alert("已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。");
+                                            } catch (e) {
+                                                console.error("Bundle error", e);
+                                                alert("產生分享連結失敗");
+                                            }
+                                        }
+                                    }
+                                }}
+                                title={isOffline ? "目前為離線模式" : "點擊複製一鍵分享懶人包"}
                             >
                                 {isOffline ? <WifiOff size={16} className="text-red-300"/> : <Wifi size={16} className="text-[#00FF00]"/>}
                             </div>
@@ -1378,34 +1447,49 @@
             useEffect(() => {
                 if (!tripId) return;
 
+                // Helper: Ensure data structure is complete (migration for old data)
+                // 補回這個函式以避免 ReferenceError
+                const processLoadedData = (d) => ({
+                    ...d,
+                    flights: d.flights || { outbound: {}, inbound: {} },
+                    expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
+                    accommodations: d.accommodations || {},
+                    itinerary: d.itinerary || {}
+                });
+
                 // 1. If Offline, load from LocalStorage
                 if (isOffline) {
                     const localData = localStorage.getItem(`gtp_trip_${tripId}`);
                     if (localData) {
-                        const d = processLoadedData(JSON.parse(localData));
-                        setTripData(d);
-                        
-                        if(!selectedDate) setSelectedDate(d.startDate);
-                        
-                        let found = d.members.find(m => m.deviceId === userId);
-                        if (!found && d.members.length > 0) {
-                             found = d.members.find(m => m.role === 'owner') || d.members[0];
-                        }
-                        if (found) {
-                            setCurrentMember(found);
-                            // Only force redirect if we were in landing or setup
-                            if(view === 'landing' || view === 'setup') {
-                                 setView('planner');
-                                 setSelectedDate(d.startDate);
+                        try {
+                            const d = processLoadedData(JSON.parse(localData));
+                            setTripData(d);
+                            
+                            if(!selectedDate) setSelectedDate(d.startDate);
+                            
+                            let found = d.members.find(m => m.deviceId === userId);
+                            if (!found && d.members.length > 0) {
+                                 found = d.members.find(m => m.role === 'owner') || d.members[0];
                             }
-                        }
+                            if (found) {
+                                setCurrentMember(found);
+                                // Only force redirect if we were in landing or setup
+                                if(view === 'landing' || view === 'setup') {
+                                     setView('planner');
+                                     setSelectedDate(d.startDate);
+                                }
+                            }
 
-                        // 新增：讀取成功後，更新近期紀錄 (Fix: Update recent trips in offline mode)
-                        setRecentTrips(p => { 
-                            const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
-                            localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
-                            return newRecents; 
-                        });
+                            // 新增：讀取成功後，更新近期紀錄 (Fix: Update recent trips in offline mode)
+                            setRecentTrips(p => { 
+                                const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
+                                localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
+                                return newRecents; 
+                            });
+                        } catch (e) {
+                            console.error("Error loading local data", e);
+                            alert("讀取本機資料時發生錯誤");
+                        }
                     }
                 } else {
                     // 2. If Online, load from Firestore
@@ -1421,7 +1505,7 @@
                     const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), 
                         async (s) => { // Made async to handle auto-upload
                             if(s.exists()) {
-                                const d = s.data();
+                                const d = processLoadedData(s.data());
                                 setTripData(d);
                                 
                                 // Fix: Check ref instead of stale state variable to prevent unwanted reset
@@ -1453,7 +1537,7 @@
                                 if (localData) {
                                     try {
                                             console.log("Auto-uploading local data to Firebase...");
-                                            const d = JSON.parse(localData);
+                                            const d = processLoadedData(JSON.parse(localData));
                                             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(d));
                                     } catch (e) {
                                             console.error("Auto-upload failed", e);
@@ -2098,12 +2182,36 @@
                                                         className="text-xl font-bold text-gray-700 flex items-center gap-2 cursor-pointer active:scale-95 transition-transform"
                                                         onClick={() => {
                                                             const textArea = document.createElement("textarea");
-                                                            textArea.value = tripData.id;
+                                                            
+                                                            // NEW: 一鍵分享邏輯 (與 Header 按鈕邏輯一致)
+                                                            let textToCopy = tripData.id;
+                                                            let alertMsg = isOffline ? "已複製本機 ID (此 ID 僅能在此瀏覽器上讀取)" : "ID 已複製，傳送給朋友即可加入旅程！";
+
+                                                            // 只有在連線模式下，才嘗試打包設定檔
+                                                            if (!isOffline) {
+                                                                const fbConfigStr = localStorage.getItem('gtp_firebase_config');
+                                                                const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key');
+                                                                if (fbConfigStr) {
+                                                                    try {
+                                                                        const bundle = {
+                                                                            id: tripData.id,
+                                                                            firebase: JSON.parse(fbConfigStr),
+                                                                            imgbb: imgbbKeyStr || ''
+                                                                        };
+                                                                        textToCopy = JSON.stringify(bundle);
+                                                                        alertMsg = "已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。";
+                                                                    } catch (e) {
+                                                                        console.error("Bundle error", e);
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            textArea.value = textToCopy;
                                                             document.body.appendChild(textArea);
                                                             textArea.select();
                                                             document.execCommand("Copy");
                                                             textArea.remove();
-                                                            alert(isOffline ? "已複製本機 ID (此 ID 僅能在此瀏覽器上讀取)" : "ID 已複製，傳送給朋友即可加入旅程！"); 
+                                                            alert(alertMsg); 
                                                         }}
                                                     >
                                                         {tripData.id}
