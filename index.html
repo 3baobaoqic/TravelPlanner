@@ -1661,6 +1661,63 @@
                 updateTripFull(newData);
             };
 
+            const handleDeleteDate = () => {
+                if (!isOwner) return;
+                
+                const dates = getDatesArray(tripData.startDate, tripData.endDate);
+                if (dates.length <= 1) {
+                    alert("旅程至少需要保留一天，無法刪除最後一天。");
+                    return;
+                }
+
+                setConfirm({
+                    open: true,
+                    msg: `確定要刪除 ${selectedDate} 的所有行程嗎？\n\n注意：\n1. 當日所有活動與記帳將被移除\n2. 後續日期的行程將往前遞補\n3. 旅程總天數將減少一天`,
+                    action: () => {
+                        const targetIndex = dates.indexOf(selectedDate);
+                        if (targetIndex === -1) return;
+
+                        const newItinerary = { ...tripData.itinerary };
+                        const newAccommodations = { ...tripData.accommodations };
+
+                        // 將後面的日期資料往前搬移
+                        for (let i = targetIndex; i < dates.length - 1; i++) {
+                            const currDate = dates[i];
+                            const nextDate = dates[i+1];
+                            newItinerary[currDate] = newItinerary[nextDate] || [];
+                            newAccommodations[currDate] = newAccommodations[nextDate] || [];
+                        }
+
+                        // 刪除最後一天的資料 (因為已經移到前一天了，或者本來就是空的)
+                        const oldEndDate = dates[dates.length - 1];
+                        delete newItinerary[oldEndDate];
+                        delete newAccommodations[oldEndDate];
+
+                        // 計算新的結束日期 (減一天)
+                        const newEndDateObj = new Date(tripData.endDate);
+                        newEndDateObj.setDate(newEndDateObj.getDate() - 1);
+                        const newEndDate = newEndDateObj.toISOString().split('T')[0];
+
+                        // 決定刪除後要停留在哪一天
+                        // 如果刪除的是最後一天，就跳到新的最後一天；否則停留在原日期(因為後面的補上來了)
+                        let newSelectedDate = selectedDate;
+                        if (selectedDate > newEndDate) {
+                            newSelectedDate = newEndDate;
+                        }
+
+                        const newData = {
+                            ...tripData,
+                            endDate: newEndDate,
+                            itinerary: newItinerary,
+                            accommodations: newAccommodations
+                        };
+
+                        updateTripFull(newData);
+                        setSelectedDate(newSelectedDate);
+                    }
+                });
+            };
+
             // Modified: Enhanced logic to handle date changes (cleanup old dates) and prevent duplicate blank cards
             const handleUpdateAccommodation = (id, field, val) => { 
                 if(!isOwner) return; 
@@ -2086,6 +2143,17 @@
                                                             )})}
                                                         </div>
                                                         <AccommodationCard date={selectedDate} data={Array.isArray(tripData.accommodations?.[selectedDate]) ? tripData.accommodations[selectedDate] : (tripData.accommodations?.[selectedDate] ? [tripData.accommodations[selectedDate]] : [])} onUpdate={handleUpdateAccommodation} onPhotoUpload={(id) => { setUploadTarget({type: 'accom', id: id}); fileRef.current?.click(); }} onPhotoDelete={handlePhotoDelete} onViewImage={(u)=>setModals({...modals, viewingImage:u})} onAdd={handleAddAccommodation} onDelete={handleDeleteAccommodation} isOwner={isOwner} currentMember={currentMember} />
+                                                        
+                                                        {isOwner && (
+                                                            <div className="mt-8 mb-4 flex justify-center">
+                                                                <button 
+                                                                    onClick={handleDeleteDate}
+                                                                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-400 rounded-xl text-xs font-bold hover:bg-red-100 hover:text-red-500 transition-colors border border-red-100"
+                                                                >
+                                                                    <Trash2 size={14} /> 刪除當日 ({selectedDate})
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </>
                                                 ) : (
                                                     // ... (Expense View)
