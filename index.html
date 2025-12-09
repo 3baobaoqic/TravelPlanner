@@ -1923,7 +1923,12 @@
                                                 </div>
                                             )}
 
-                                            <button onClick={()=>{setView('setup'); setIsMenuOpen(false);}} className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 font-bold text-gray-600">建立新旅程</button>
+                                            <button 
+                                                onClick={()=>{setView('setup'); setIsMenuOpen(false);}} 
+                                                className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
+                                            >
+                                                <Plus size={18} /> 建立新旅程
+                                            </button>
                                             {view !== 'setup' && (
                                                 <button 
                                                     onClick={() => { setModals({ ...modals, members: true }); setIsMenuOpen(false); }} 
