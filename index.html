@@ -50,7 +50,6 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        // Modified: Added 'Info' to imports
         import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
@@ -587,6 +586,74 @@
                         onConfirm={() => { onRemoveMember(confirmRemove); setConfirmRemove(null); }} 
                         onCancel={() => setConfirmRemove(null)} 
                     />
+                </div>
+            );
+        };
+
+        // --- Join Modal ---
+        const JoinModal = ({ isOpen, onClose, tripData, onJoin }) => {
+            const [mode, setMode] = useState('new'); 
+            const [name, setName] = useState('');
+            const [pin, setPin] = useState('');
+            const [error, setError] = useState('');
+
+            if (!isOpen || !tripData) return null;
+
+            const handleJoin = () => {
+                setError('');
+                if (!pin.trim()) { setError('請輸入 PIN 碼'); return; }
+                
+                if (mode === 'new') {
+                    if (!name.trim()) { setError('請輸入您的暱稱'); return; }
+                    if (tripData.members.some(m => m.name === name.trim())) { setError('此暱稱已被使用，請更換'); return; }
+                    onJoin({ name: name.trim(), pin: pin.trim(), role: 'collaborator', isNew: true });
+                } else {
+                    if (!name) { setError('請選擇您的身分'); return; }
+                    const member = tripData.members.find(m => m.name === name);
+                    if (!member) { setError('找不到成員資料'); return; }
+                    if (member.pin !== pin.trim()) { setError('PIN 碼錯誤'); return; }
+                    onJoin({ name: member.name, pin: member.pin, role: member.role, isNew: false });
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
+                    <div className="bg-[#F5FDFC] w-full max-w-sm rounded-2xl p-6 border border-[#eeeeee] shadow-2xl relative z-10 flex flex-col">
+                        <h3 className="text-xl font-bold text-[#0ABAB5] mb-4 text-center">加入旅程</h3>
+                        <div className="flex bg-gray-200 p-1 rounded-xl mb-4">
+                            <button onClick={() => setMode('new')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'new' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>我是新協作者</button>
+                            <button onClick={() => setMode('old')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'old' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>我是舊成員</button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {mode === 'new' ? (
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 block mb-1">您的暱稱</label>
+                                    <input value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]" placeholder="例如：小明" />
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 block mb-1">選擇您的身分</label>
+                                    <select value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]">
+                                        <option value="">-- 請選擇 --</option>
+                                        {tripData.members.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1">{mode === 'new' ? '設定您的 PIN 碼' : '輸入 PIN 碼驗證'}</label>
+                                <input type="password" value={pin} onChange={e => setPin(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]" placeholder="****" />
+                            </div>
+                        </div>
+
+                        {error && <p className="text-red-500 text-xs font-bold mt-3 text-center">{error}</p>}
+
+                        <button onClick={handleJoin} className="w-full py-3 bg-[#0ABAB5] text-white rounded-xl font-bold border border-[#0ABAB5] hover:bg-[#008985] transition-all mt-6">
+                            {mode === 'new' ? '加入並開始' : '驗證並登入'}
+                        </button>
+                    </div>
                 </div>
             );
         };
