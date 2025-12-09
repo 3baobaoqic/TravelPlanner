@@ -288,9 +288,15 @@
                     return;
                 }
 
-                // 防呆機制：如果使用者填寫了設定檔，但還是離線狀態（代表沒存檔），且本地沒有設定檔
+                // 防呆機制 1: 已經測試成功，但還沒儲存 (最常見的情況)
+                if (isOffline && testStatus === 'success') {
+                    alert("您已測試連線成功，但尚未儲存！\n\n請務必點擊下方的「儲存連線」按鈕，直到出現綠色 Wifi 圖示，系統才能讀取雲端行程。");
+                    return;
+                }
+
+                // 防呆機制 2: 填寫了設定檔，但完全沒動作
                 if (isOffline && configInput.trim().length > 10 && !localStorage.getItem('gtp_firebase_config')) {
-                    alert("您已填寫 Firebase 設定，但尚未建立連線！\n\n請先點擊上方的「測試連線」確認無誤後，務必點擊「儲存連線」按鈕，才能讀取雲端行程。");
+                    alert("您已填寫 Firebase 設定，但尚未建立連線！\n\n請先點擊上方的「測試連線」確認無誤後，再點擊「儲存連線」按鈕。");
                     return;
                 }
                 
@@ -1686,7 +1692,10 @@
             };
 
             const handleLocalJoin = (targetId) => {
-                const idToJoin = targetId || joinId;
+                // 優先使用 targetId，若無則使用 joinId，並強制移除前後空白，避免複製貼上時出錯
+                const rawId = targetId !== undefined ? targetId : joinId;
+                const idToJoin = (rawId || '').toString().trim();
+                
                 if (!idToJoin) return;
                 
                 // 1. Always check local storage first (fastest)
