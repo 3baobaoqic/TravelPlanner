@@ -1423,7 +1423,11 @@
                 // 補回這個函式以避免 ReferenceError
                 const processLoadedData = (d) => ({
                     ...d,
-                    flights: d.flights || { outbound: {}, inbound: {} },
+                    // FIX: Ensure flights deep structure exists to prevent crash
+                    flights: {
+                        outbound: (d.flights && d.flights.outbound) || {},
+                        inbound: (d.flights && d.flights.inbound) || {}
+                    },
                     expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
                     accommodations: d.accommodations || {},
                     itinerary: d.itinerary || {}
