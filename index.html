@@ -703,7 +703,18 @@
         const AutoSaveInput = ({ value, onSave, readOnly, ...props }) => {
             const [v, setV] = useState(value ?? '');
             useEffect(() => setV(value ?? ''), [value]);
-            const propsFinal = { ...props, value: v, onChange: e => setV(e.target.value), onBlur: () => v !== (value??'') && onSave(v), onKeyDown: e => e.key === 'Enter' && e.target.blur(), readOnly };
+            
+            // FIX: Ensure comparison handles null/undefined correctly to avoid unnecessary saves when data is dirty
+            const handleBlur = () => {
+                const normalizedV = v === null || v === undefined ? '' : String(v);
+                const normalizedValue = value === null || value === undefined ? '' : String(value);
+
+                if (normalizedV !== normalizedValue) {
+                    onSave(v);
+                }
+            };
+            
+            const propsFinal = { ...props, value: v, onChange: e => setV(e.target.value), onBlur: handleBlur, onKeyDown: e => e.key === 'Enter' && e.target.blur(), readOnly };
             return props.type === 'textarea' ? <textarea {...propsFinal} /> : <input {...propsFinal} />;
         };
 
@@ -968,8 +979,8 @@
             );
         };
 
-        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues, currentMember }) => {
-            const [formData, setFormData] = useState({ time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: 'JPY', payer: '我', category: '', photoUrls: [] });
+        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues, currentMember, selectedDate }) => {
+            const [formData, setFormData] = useState({ date: selectedDate, time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: 'JPY', payer: '我', category: '', photoUrls: [] });
             const [confirm, setConfirm] = useState({ open: false, idx: null });
             const fileRef = useRef(null);
             
@@ -980,7 +991,9 @@
                              ...defaultValues,
                              currency: defaultValues.currency || tripData?.currency || 'JPY',
                              payer: defaultValues.payer || currentMember?.name || tripData?.members?.[0]?.name || '我',
-                             category: defaultValues.category || ''
+                             category: defaultValues.category || '',
+                             // FIX: Ensure date is correctly initialized for editing (using 'date' property)
+                             date: defaultValues.date || selectedDate 
                          }); 
                      } else { 
                          setFormData({ 
@@ -989,11 +1002,13 @@
                              currency: tripData?.currency || 'JPY', 
                              payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
                              category: '', // Will be auto-set by transport effect
-                             photoUrls: [] 
+                             photoUrls: [],
+                             // FIX: Use selectedDate as default for new creation
+                             date: selectedDate
                          }); 
                      }
                  }
-            }, [isOpen, defaultValues, tripData, currentMember]);
+            }, [isOpen, defaultValues, tripData, currentMember, selectedDate]);
 
             // Effect: Auto-set category based on transport if category is empty
             useEffect(() => {
@@ -1007,7 +1022,12 @@
             }, [formData.transport, isOpen, defaultValues]);
 
             if (!isOpen) return null;
-            const handleSave = () => { if(!formData.title.trim()) return alert('請輸入名稱'); onSave({...formData, cost: parseFloat(formData.cost)||0}); onClose(); };
+            const handleSave = () => { 
+                if(!formData.title.trim()) return alert('請輸入名稱'); 
+                // Pass date in data object for cross-date saving
+                onSave({...formData, cost: parseFloat(formData.cost)||0}); 
+                onClose(); 
+            };
             
             // Modified: Use processImageUpload for unified logic
             const handleFile = async (e) => { 
@@ -1027,10 +1047,13 @@
                     <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
                         <div className="bg-[#6A8E83] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯行程' : '新增行程'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
                         <div className="p-4 space-y-4 overflow-y-auto">
+                            {/* FIX: Changed UI structure to include date input */}
                             <div className="flex gap-2">
-                                <div className="w-1/3"><label className="text-xs text-gray-400 font-bold block">時間</label><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
-                                <div className="w-2/3"><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
+                                <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">日期</label><input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
+                                <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">時間</label><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                             </div>
+                            <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
+                            
                             <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={2} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm resize-none text-gray-700 border border-[#eeeeee]" /></div>
                             <div className="flex gap-2">
                                 <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">交通</label><select value={formData.transport} onChange={e=>setFormData({...formData, transport:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{transportOptions.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
@@ -1087,7 +1110,7 @@
             );
         };
 
-        const ExpenseModal = ({ isOpen, onClose, tripData, onSave, onUpdateCategories, selectedDate, currentMember, defaultValues }) => {
+        const ExpenseModal = ({ isOpen, onClose, onSave, onUpdateCategories, selectedDate, currentMember, defaultValues, tripData }) => {
             const [formData, setFormData] = useState({ date: selectedDate, time: '', cost: '', title: '', payer: '', currency: '', category: '', photoUrls: [], note: '' });
             const [isManage, setIsManage] = useState(false);
             const [newCat, setNewCat] = useState('');
@@ -1683,12 +1706,54 @@
                 if(idx>=0) { acts[idx][field]=val; updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); } 
             };
 
+            // FIX: Modified to support cross-date activity saving
             const handleSaveActivity = (data) => {
                 if (!isOwner) return; 
-                let acts = [...(tripData.itinerary[selectedDate] || [])];
-                if (editingActivity) { acts = acts.map(a => a.id === editingActivity.id ? { ...data, id: editingActivity.id, createdBy: currentMember.name } : a); } 
-                else { acts.push({ id: generateId(), ...data, createdBy: currentMember.name }); }
-                updateTrip('itinerary', { ...tripData.itinerary, [selectedDate]: acts });
+                
+                const targetDate = data.date;
+                // For editing, if defaultValues exists, use the original date and ID
+                const oldDate = editingActivity?.date || selectedDate;
+                const activityId = editingActivity?.id || generateId();
+                const activityCreator = editingActivity?.createdBy || currentMember.name;
+
+                const activityData = { ...data };
+                delete activityData.date; // Date is used as key, remove from object payload
+                
+                const newItinerary = { ...tripData.itinerary };
+
+                if (editingActivity) {
+                    // Update Mode
+                    if (oldDate !== targetDate) {
+                        // 1. Remove from old date
+                        if (newItinerary[oldDate]) {
+                            newItinerary[oldDate] = newItinerary[oldDate].filter(a => a.id !== activityId);
+                        }
+                    } else {
+                        // 2. Simple update on the same day (remove old, add new to ensure proper re-sort)
+                        newItinerary[targetDate] = (newItinerary[targetDate] || []).filter(a => a.id !== activityId);
+                    }
+                } else if (newItinerary[oldDate]) { // Non-editing, check if exists on selected date
+                     // If adding a new activity, simply push to the targetDate. The filtering in the else block above is not strictly necessary for CREATE, but we keep the targetDate handling logic here.
+                }
+
+                // 3. Add or update on the target date
+                if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
+                // Re-filter before push in case of non-editing mode to ensure uniqueness for current operation
+                if (!editingActivity) {
+                    newItinerary[targetDate] = newItinerary[targetDate].filter(a => a.id !== activityId);
+                }
+                newItinerary[targetDate].push({
+                    id: activityId,
+                    ...activityData,
+                    createdBy: activityCreator
+                });
+                
+                // If the selectedDate remains valid after saving, set it to target date if it changed
+                if (selectedDate !== targetDate) {
+                   setSelectedDate(targetDate);
+                }
+
+                updateTrip('itinerary', newItinerary);
                 setEditingActivity(null);
             };
 
@@ -2324,6 +2389,7 @@
                                                 {view === 'planner' ? (
                                                     <>
                                                         <div className="grid grid-cols-2 gap-3 mb-4">
+                                                            {/* FIX: Pass selectedDate to ActivityModal */}
                                                             {isOwner && <button onClick={()=>setModals({...modals, activity:true})} className="p-3 rounded-2xl bg-[#6A8E83] text-white font-bold flex justify-center items-center gap-2 border border-[#6A8E83]"><Plus size={18}/> 新增行程</button>}
                                                             <button onClick={()=>setModals({...modals, expense:true})} className={`p-3 rounded-2xl bg-[#D68C68] text-white font-bold flex justify-center items-center gap-2 border border-[#D68C68] ${!isOwner ? 'col-span-2' : ''}`}><DollarSign size={18}/> 記帳</button>
                                                         </div>
@@ -2551,7 +2617,7 @@
                                                 )}
                                             </div>
 
-                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} />
+                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} selectedDate={selectedDate} />
                                             <ExpenseModal 
                                                 isOpen={modals.expense} 
                                                 onClose={()=> { setModals({...modals, expense:false}); setEditingExpense(null); }} 
