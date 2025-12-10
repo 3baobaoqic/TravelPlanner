@@ -1328,9 +1328,14 @@
             
             // Helper: Ensure data structure is complete (migration for old data)
             // 【修復關鍵】將此函式移出 useEffect，使其成為 App 內的通用函式，避免 ReferenceError
+            // 加強版防呆：強制補齊 members 與 flights 結構，防止白屏
             const processLoadedData = (d) => ({
                 ...d,
-                flights: d.flights || { outbound: {}, inbound: {} },
+                members: Array.isArray(d.members) ? d.members : [],
+                flights: {
+                    outbound: d.flights?.outbound || {},
+                    inbound: d.flights?.inbound || {}
+                },
                 expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
                 accommodations: d.accommodations || {},
                 itinerary: d.itinerary || {}
