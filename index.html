@@ -2113,7 +2113,8 @@
 
             const sortedActivities = useMemo(() => {
                 const acts = tripData?.itinerary?.[selectedDate] || [];
-                return [...acts].sort((a, b) => a.time.localeCompare(b.time));
+                // FIX: Add fallback for missing time to prevent crash
+                return [...acts].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
             }, [tripData, selectedDate]);
 
             if (authError || connectionTimeout) return <div className="flex h-screen items-center justify-center bg-red-50 p-8"><div className="bg-[#F5FDFC] p-6 rounded-2xl shadow-xl max-w-md text-center"><h2 className="text-2xl font-bold text-red-500 mb-2">{authError ? "Firebase 驗證錯誤" : "連線逾時"}</h2><button onClick={() => window.location.reload()} className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">重試</button></div></div>;
