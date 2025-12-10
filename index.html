@@ -916,7 +916,7 @@
                     })}
 
                     {/* Button Moved to Bottom Right Outside - Adjusted further down */}
-                    {isOwner && <button onClick={onAdd} className="absolute -bottom-5 right-2 bg-yellow-400 text-white shadow-md rounded-full p-1.5 hover:bg-yellow-500 transition-colors z-10 border-2 border-white"><Plus size={14} /></button>}
+                    {isOwner && <button onClick={onAdd} className="absolute -bottom-6 right-2 bg-yellow-400 text-white shadow-md rounded-full p-1.5 hover:bg-yellow-500 transition-colors z-10 border-2 border-white"><Plus size={14} /></button>}
                 </div>
             );
         };
@@ -1898,6 +1898,8 @@
                 if (itemIndex === -1) return;
                 
                 const oldItem = currentList[itemIndex];
+                
+                // FIX: Update the specific field in the current item copy
                 const updatedItem = { ...oldItem, [field]: val };
                 currentList[itemIndex] = updatedItem;
                 newAccommodations[selectedDate] = currentList;
@@ -1913,67 +1915,66 @@
                 };
 
                 // 2. Logic to Sync to other dates
-                if (updatedItem.checkInDate && updatedItem.checkOutDate) {
-                    const newStart = updatedItem.checkInDate;
-                    const newEnd = updatedItem.checkOutDate;
-                    const oldStart = oldItem.checkInDate;
-                    const oldEnd = oldItem.checkOutDate;
+                
+                // --- Determine the fields that need synchronization ---
+                const fieldsToSync = ['name', 'bookingCode', 'note', 'phone', 'address', 'photoUrls'];
+                const isFieldToSync = fieldsToSync.includes(field);
+                
+                // --- Determine range changes ---
+                const rangeChanged = (updatedItem.checkInDate !== oldItem.checkInDate) || (updatedItem.checkOutDate !== oldItem.checkOutDate);
+                
+                // Only run complex range sync logic if needed
+                if (rangeChanged || isFieldToSync) {
 
-                    // A. Cleanup Logic: If dates changed, remove this item from days that are no longer in range
-                    if (oldStart && oldEnd && (oldStart !== newStart || oldEnd !== newEnd)) {
-                        const s = new Date(oldStart);
-                        const e = new Date(oldEnd);
-                        // Loop through old range to find what to delete
-                        for (let d = new Date(s); d < e; d.setDate(d.getDate() + 1)) {
-                            const dStr = d.toISOString().split('T')[0];
-                            if (dStr === selectedDate) continue; // Don't remove from current view
-                            
-                            // If this date is NOT in the new range, remove the item
-                            if (!isInRange(dStr, newStart, newEnd)) {
-                                if (newAccommodations[dStr]) {
-                                    newAccommodations[dStr] = newAccommodations[dStr].filter(i => i.id !== id);
-                                }
-                            }
-                        }
-                    }
+                    // Collect all dates in the current trip range
+                    const allDates = getDatesArray(tripData.startDate, tripData.endDate);
 
-                    // B. Sync Logic: Add/Update to new range
-                    const nStart = new Date(newStart);
-                    const nEnd = new Date(newEnd);
-                    const diffTime = Math.abs(nEnd - nStart);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    allDates.forEach(dateStr => {
+                        // Skip if the current date hasn't been initialized in accommodations yet
+                        if (!newAccommodations[dateStr]) return;
+                        
+                        // Check if this item should exist on this day based on the new date range
+                        const shouldExist = updatedItem.checkInDate && updatedItem.checkOutDate 
+                            ? isInRange(dateStr, updatedItem.checkInDate, updatedItem.checkOutDate)
+                            : dateStr === selectedDate; // Fallback: only exists on its creation day if dates aren't set
 
-                    if (diffDays > 0 && diffDays < 60) {
-                        for (let d = new Date(nStart); d < nEnd; d.setDate(d.getDate() + 1)) {
-                            const dateStr = d.toISOString().split('T')[0];
-                            if (dateStr === selectedDate) continue;
+                        let dayList = [...newAccommodations[dateStr]];
+                        const existingIdx = dayList.findIndex(i => i.id === id);
 
-                            if (!newAccommodations[dateStr]) newAccommodations[dateStr] = [];
-                            
-                            const dayList = [...newAccommodations[dateStr]];
-                            const existingIdx = dayList.findIndex(i => i.id === id);
-
+                        if (shouldExist) {
+                            // Item should exist on this day
                             if (existingIdx > -1) {
-                                // Update existing linked item
-                                dayList[existingIdx] = { ...updatedItem };
-                            } else {
-                                // Fix: Check for "Ghost" blank cards created by default
-                                // If the day has only 1 item and it's empty, remove it before adding the real one
-                                if (dayList.length === 1) {
-                                    const ex = dayList[0];
-                                    const isEmpty = !ex.name && !ex.bookingCode && !ex.checkInDate && !ex.checkOutDate && !ex.note && (!ex.photoUrls || ex.photoUrls.length === 0);
-                                    if (isEmpty) {
-                                        dayList.pop();
-                                    }
+                                // 存在：更新所有欄位
+                                // Use oldItem properties if the specific field wasn't changed now (only sync changed date fields)
+                                if (rangeChanged) {
+                                    // Range changed: full sync of all linked items
+                                    dayList[existingIdx] = { ...updatedItem };
+                                } else if (isFieldToSync) {
+                                    // Content changed: sync only the changed content field
+                                    dayList[existingIdx] = { ...dayList[existingIdx], [field]: val };
                                 }
-                                // Add new linked item
+                                
+                            } else if (dateStr !== updatedItem.checkOutDate) { // Avoid adding to checkout date itself
+                                // 不存在：如果不是當前編輯的日期，且在新的範圍內，則添加副本
+                                // First remove placeholder if exists
+                                if (dayList.length === 1 && !dayList[0].name && !dayList[0].bookingCode) {
+                                    dayList = [];
+                                }
                                 dayList.push({ ...updatedItem });
                             }
-                            newAccommodations[dateStr] = dayList;
+                        } else {
+                            // Item should NOT exist on this day: Remove it
+                            if (existingIdx > -1) {
+                                dayList.splice(existingIdx, 1);
+                            }
                         }
-                    }
-                }
 
+                        // Update the accommodations map for this date
+                        newAccommodations[dateStr] = dayList.filter(Boolean);
+                    });
+                }
+                // --- End Sync Logic ---
+                
                 updateTrip('accommodations', newAccommodations);
             };
 
@@ -1988,18 +1989,33 @@
                     
                     if (finalUrl) {
                         const photoObj = { url: finalUrl, uploader: currentMember.name };
+                        const newPhotoUrls = [...(uploadTarget.data?.photoUrls || []), photoObj];
+
+                        // Logic to sync photoUrls across multiple components/dates
                         if (uploadTarget.type === 'activity') {
                             const acts = [...tripData.itinerary[selectedDate]];
                             const idx = acts.findIndex(a=>a.id===uploadTarget.id);
                             if(idx>=0) { 
-                                acts[idx].photoUrls = [...(acts[idx].photoUrls||[]), photoObj]; 
+                                acts[idx].photoUrls = newPhotoUrls;
                                 updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
                             }
                         } else if (uploadTarget.type === 'accom') {
-                            let currentList = tripData.accommodations[selectedDate];
-                            if (!Array.isArray(currentList)) currentList = [currentList];
-                            const newList = currentList.map(item => item.id === uploadTarget.id ? { ...item, photoUrls: [...(item.photoUrls || []), photoObj] } : item);
-                            updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList });
+                            // Special case for accommodation: Need to update all linked dates
+                            const newAccoms = { ...tripData.accommodations };
+                            const allDates = getDatesArray(tripData.startDate, tripData.endDate);
+
+                            allDates.forEach(dateStr => {
+                                if (newAccoms[dateStr]) {
+                                    newAccoms[dateStr] = newAccoms[dateStr].map(item => {
+                                        if (item.id === uploadTarget.id) {
+                                            // The core accommodation object is modified here
+                                            return { ...item, photoUrls: newPhotoUrls };
+                                        }
+                                        return item;
+                                    });
+                                }
+                            });
+                            updateTrip('accommodations', newAccoms);
                         }
                     }
                 }
@@ -2008,6 +2024,9 @@
 
             const handlePhotoDelete = (targetId, urlToDelete, type) => {
                 setConfirm({ open: true, msg: '確定要刪除這張照片嗎？', action: () => {
+                    const newAccoms = { ...tripData.accommodations };
+                    const allDates = getDatesArray(tripData.startDate, tripData.endDate);
+
                     if (type === 'activity') {
                         const acts = [...tripData.itinerary[selectedDate]];
                         const idx = acts.findIndex(a => a.id === targetId);
@@ -2015,11 +2034,22 @@
                             acts[idx].photoUrls = acts[idx].photoUrls.filter(p => (typeof p === 'string' ? p : p.url) !== urlToDelete); 
                             updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
                         }
-                    } else {
-                        let currentList = tripData.accommodations[selectedDate];
-                        if (!Array.isArray(currentList)) currentList = [currentList];
-                        const newList = currentList.map(item => item.id === targetId ? { ...item, photoUrls: item.photoUrls.filter(p => (typeof p === 'string' ? p : p.url) !== urlToDelete) } : item);
-                        updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList });
+                    } else { // type === 'accom'
+                        // FIX: Iterate all dates to remove the photo from all linked copies
+                        allDates.forEach(dateStr => {
+                            if (newAccoms[dateStr]) {
+                                newAccoms[dateStr] = newAccoms[dateStr].map(item => {
+                                    if (item.id === targetId) {
+                                        return { 
+                                            ...item, 
+                                            photoUrls: item.photoUrls.filter(p => (typeof p === 'string' ? p : p.url) !== urlToDelete) 
+                                        };
+                                    }
+                                    return item;
+                                });
+                            }
+                        });
+                        updateTrip('accommodations', newAccoms);
                     }
                 }});
             };
@@ -2264,7 +2294,7 @@
                                                             <input type="date" value={setupForm.startDate} onChange={e=>setSetupForm({...setupForm, startDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
                                                             <input type="date" value={setupForm.endDate} onChange={e=>setSetupForm({...setupForm, endDate:e.target.value})} className="flex-1 p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 font-bold" />
                                                         </div>
-                                                        <select value={setupForm.currency} onChange={e=>setSetupForm({...setupForm, currency:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700">
+                                                        <select value={setupForm.currency} onChange={e=>setSetupForm({...formData, currency:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700">
                                                             {currencies.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
                                                         </select>
                                                         <div className="grid grid-cols-2 gap-2">
@@ -2444,7 +2474,7 @@
                                                                                         <div className="flex items-center gap-2">
                                                                                             <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
                                                                                             <span className="text-gray-600 font-medium">{item.category}</span>
-                                                                                        </div>
+                                                            v                                                         </div>
                                                                                         <div className="flex items-center gap-2">
                                                                                             <span className="text-gray-400 text-[10px]">({Math.round((item.value / stat.total) * 100)}%)</span>
                                                                                             <span className="font-bold text-gray-700 text-sm">${item.value.toLocaleString()}</span>
