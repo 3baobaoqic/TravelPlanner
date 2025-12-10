@@ -1430,7 +1430,9 @@
                     },
                     expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
                     accommodations: d.accommodations || {},
-                    itinerary: d.itinerary || {}
+                    itinerary: d.itinerary || {},
+                    // FIX: Ensure members array exists to prevent crash in onSnapshot
+                    members: d.members || []
                 });
 
                 // 1. If Offline, load from LocalStorage
