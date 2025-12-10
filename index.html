@@ -1326,6 +1326,16 @@
             // Derived state placed early to ensure scope availability
             const isOwner = currentMember?.role === 'owner';
             
+            // Helper: Ensure data structure is complete (migration for old data)
+            // 【修復關鍵】將此函式移出 useEffect，使其成為 App 內的通用函式，避免 ReferenceError
+            const processLoadedData = (d) => ({
+                ...d,
+                flights: d.flights || { outbound: {}, inbound: {} },
+                expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
+                accommodations: d.accommodations || {},
+                itinerary: d.itinerary || {}
+            });
+
             // Load recent trips and cleanup restore state on mount
             useEffect(() => {
                 const storedRecents = localStorage.getItem('gtp_recent_trips');
@@ -1447,15 +1457,7 @@
             useEffect(() => {
                 if (!tripId) return;
 
-                // Helper: Ensure data structure is complete (migration for old data)
-                // 補回這個函式以避免 ReferenceError
-                const processLoadedData = (d) => ({
-                    ...d,
-                    flights: d.flights || { outbound: {}, inbound: {} },
-                    expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
-                    accommodations: d.accommodations || {},
-                    itinerary: d.itinerary || {}
-                });
+                // processLoadedData is now available here from the outer scope
 
                 // 1. If Offline, load from LocalStorage
                 if (isOffline) {
