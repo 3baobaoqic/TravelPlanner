@@ -36,7 +36,7 @@
             display: none;
         }
         /* Disable input interaction when readOnly */
-        input:read-only, select:disabled, textarea:read-only {
+        input:read-only, select:disabled, textarea:readOnly {
             pointer-events: none;
             opacity: 0.8;
         }
@@ -50,7 +50,7 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info } from 'lucide-react';
+        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
@@ -267,13 +267,6 @@
                     localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
                     localStorage.setItem('gtp_imgbb_key', imgbbKey.trim());
                     
-                    setTestStatus('success');
-                    if (imgbbVerified) {
-                        setSuccessMessage('連線成功！設定已儲存');
-                    } else {
-                        setSuccessMessage('連線成功 (未設定 Imgbb)');
-                    }
-                    
                     onConnect(config);
 
                 } catch (e) {
@@ -453,20 +446,24 @@
             );
         };
 
-        const ConfirmModal = ({ isOpen, message, onConfirm, onCancel }) => !isOpen ? null : (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-                <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onCancel}></div>
-                <div className="bg-[#F5FDFC] w-full max-w-xs rounded-2xl p-6 border border-[#eeeeee] relative z-10 flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-500"><Trash2 size={24} /></div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-2">確認</h3>
-                    <p className="text-gray-600 mb-6 text-sm">{message}</p>
-                    <div className="flex gap-3 w-full">
-                        <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-gray-500 font-bold bg-gray-200 border border-[#eeeeee]">取消</button>
-                        <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold border border-red-500">確定</button>
+        const ConfirmModal = ({ isOpen, message, onConfirm, onCancel }) => {
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onCancel}></div>
+                    <div className="bg-[#F5FDFC] w-full max-w-xs rounded-2xl p-6 border border-[#eeeeee] relative z-10 flex flex-col items-center text-center">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-500"><Trash2 size={24} /></div>
+                        <h3 className="text-lg font-bold text-gray-800 mb-2">確認</h3>
+                        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+                        <div className="flex gap-3 w-full">
+                            <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-gray-500 font-bold bg-gray-200 border border-[#eeeeee]">取消</button>
+                            <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold border border-red-500">確定</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        );
+            );
+        };
 
         const MemberManagementModal = ({ isOpen, onClose, tripData, currentMember, onUpdateMember, onRemoveMember, onAddMember }) => {
             const [editingIndex, setEditingIndex] = useState(null);
@@ -859,7 +856,7 @@
                                                 </div>
                                             </div>
 
-                                            {/* Right Column */}
+                                            /* Right Column */
                                             {/* Modified: Increased width from w-[36%] to w-[40%] to prevent date cutoff */}
                                             <div className="w-[40%] flex flex-col gap-1">
                                                 {/* Check-in Box */}
@@ -963,8 +960,8 @@
                         <div className="space-y-4">
                             <div><label className="text-xs text-gray-500 font-bold block mb-1">目的地</label><input type="text" value={formData.destination} onChange={(e) => setFormData({...formData, destination: e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 border border-[#eeeeee]" /></div>
                             <div className="flex gap-2">
-                                <div className="flex-1"><label className="text-xs text-gray-500 font-bold block mb-1">開始日期</label><input type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 border border-[#eeeeee]" /></div>
-                                <div className="flex-1"><label className="text-xs text-gray-500 font-bold block mb-1">結束日期</label><input type="date" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 border border-[#eeeeee]" /></div>
+                                <div className="flex-1"><label className="text-xs text-gray-500 font-bold block mb-1">開始日期</label><input type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} className="flex-1 p-2 bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 border border-[#eeeeee]" /></div>
+                                <div className="flex-1"><label className="text-xs text-gray-500 font-bold block mb-1">結束日期</label><input type="date" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} className="flex-1 p-2 bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 border border-[#eeeeee]" /></div>
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 font-bold block mb-1">主要貨幣</label>
@@ -1052,7 +1049,7 @@
                                 <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">日期</label><input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                                 <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">時間</label><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                             </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
+                            <div><label className="text-xs text-gray-400 font-bold block">品名</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
                             
                             <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={2} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm resize-none text-gray-700 border border-[#eeeeee]" /></div>
                             <div className="flex gap-2">
@@ -1179,7 +1176,7 @@
                                 <input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="flex-1 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
                                 <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-1/3 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
                             </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">品項</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
+                            <div><label className="text-xs text-gray-400 font-bold block">品名</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                             <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={1} placeholder="備註..." className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee] resize-none" /></div>
                             <div><label className="text-xs text-gray-400 font-bold block">照片</label><div className="flex gap-2 overflow-x-auto">{formData.photoUrls?.map((url, i)=><div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...formData.photoUrls]; n.splice(i,1); setFormData({...formData, photoUrls:n})}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>)}<button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16}/></button><input type="file" ref={fileRef} className="hidden" onChange={handleFile} /></div></div>
                             <button onClick={()=>{if(parseFloat(formData.cost)>0) { onSave(formData); }}} disabled={!formData.cost} className="w-full py-3 bg-[#D68C68] text-white rounded-xl font-bold shadow-md border border-[#D68C68]">{defaultValues ? '儲存變更' : '儲存'}</button>
@@ -1191,7 +1188,7 @@
             );
         };
 
-        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, isOffline, onOpenFirebase }) => {
+        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, onExportExpenses }) => {
             const datesList = useMemo(() => tripData ? getDatesArray(tripData.startDate, tripData.endDate) : [], [tripData]);
             
             return (
@@ -1264,6 +1261,9 @@
                             <DollarSign size={20} strokeWidth={3} />
                         </button>
                     </div>
+                    
+                    {/* Export button removed from here */}
+
                 </div>
             );
         };
@@ -1645,7 +1645,6 @@
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
-                         const db = getFirestore(apps[0]);
                          updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) });
                      }
                 }
@@ -1658,7 +1657,6 @@
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
-                         const db = getFirestore(apps[0]);
                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData));
                      }
                 }
@@ -2119,6 +2117,92 @@
                 }});
             };
 
+            // FIX: Added handleExportExpenses function
+            const handleExportExpenses = () => {
+                if (!tripData || !tripData.itinerary) {
+                    alert("無記帳資料可匯出！");
+                    return;
+                }
+
+                const allExpenses = [];
+                const allDates = getDatesArray(tripData.startDate, tripData.endDate);
+
+                allDates.forEach(date => {
+                    const dayActs = tripData.itinerary[date] || [];
+                    dayActs.filter(a => a && (a.transport === 'expense' || (a.cost && a.cost > 0))).forEach(e => {
+                        // FIX: Extract photo URL safely, showing multiple URLs joined by a separator
+                        let photoUrlsJoined = 'N/A';
+                        if (e.photoUrls && e.photoUrls.length > 0) {
+                            photoUrlsJoined = e.photoUrls.map(p => typeof p === 'string' ? p : p.url).join('; ');
+                        }
+
+                        allExpenses.push({
+                            date: date,
+                            time: e.time || 'N/A',
+                            payer: e.payer || 'N/A',
+                            title: e.title || 'N/A',
+                            category: e.category || 'N/A',
+                            cost: e.cost || 0,
+                            currency: e.currency || tripData.currency || 'TWD',
+                            photoUrls: photoUrlsJoined // FIX: Include joined photo URLs
+                        });
+                    });
+                });
+
+                if (allExpenses.length === 0) {
+                    alert("無記帳資料可匯出！");
+                    return;
+                }
+
+                // Prepare CSV content
+                // FIX: Added Category and Photos to header
+                const header = ["日期", "時間", "付款人", "品名", "分類", "價格 (金額)", "價格 (幣別)", "照片連結"];
+                
+                // Helper to format string for CSV (handle commas/quotes)
+                const escapeCsv = (str) => {
+                    if (str === null || str === undefined) return "";
+                    str = String(str);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                };
+
+                const rows = allExpenses.map(e => [
+                    escapeCsv(e.date),
+                    escapeCsv(e.time),
+                    escapeCsv(e.payer),
+                    escapeCsv(e.title),
+                    escapeCsv(e.category),
+                    escapeCsv(e.cost),
+                    escapeCsv(e.currency),
+                    escapeCsv(e.photoUrls) // FIX: Add photo links
+                ]);
+                
+                // FIX: Add BOM marker (\ufeff) to the beginning of the CSV content for Chinese compatibility in Excel
+                const BOM = '\ufeff';
+
+                const csvContent = [
+                    header.join(','),
+                    ...rows.map(row => row.join(','))
+                ].join('\n');
+
+                // Trigger download
+                const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${tripData.destination}_Expenses_${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else {
+                    alert('您的瀏覽器不支援自動下載，請複製以下內容：\n\n' + csvContent);
+                }
+            };
+
             // Modified: Group statistics by currency to allow vertical stacking of charts
             const expenseStatsByCurrency = useMemo(() => {
                 if (!tripData) return [];
@@ -2383,7 +2467,8 @@
                                             </div>
                                         ) : (
                                         <>
-                                            <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} onManageMembers={() => setModals({ ...modals, members: true })} onOpenFirebase={() => setView('landing')} isOffline={isOffline} />
+                                            {/* PASS EXPORT HANDLER TO HEADER */}
+                                            <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} onManageMembers={() => setModals({ ...modals, members: true })} onOpenFirebase={() => setView('landing')} isOffline={isOffline} onExportExpenses={handleExportExpenses} />
                                             
                                             <div className="flex-1 overflow-y-auto p-4 pb-24">
                                                 {view === 'planner' ? (
@@ -2453,13 +2538,22 @@
                                                         )}
                                                     </>
                                                 ) : (
-                                                    // ... (Expense View)
+                                                    // Expense View
                                                     <div className="space-y-6">
                                                         <div className="flex flex-col gap-3 mb-2">
                                                             <div className="flex justify-between items-center">
                                                                 <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
                                                                     <History size={20} className="text-[#D68C68]" /> 交易紀錄
                                                                 </h3>
+                                                                
+                                                                {/* Button is now correctly positioned outside h3, and the parent flex container ensures alignment */}
+                                                                <button
+                                                                    onClick={handleExportExpenses}
+                                                                    className="flex items-center justify-center p-1.5 bg-[#D68C68]/20 hover:bg-[#D68C68]/30 text-[#D68C68] rounded-full transition-colors"
+                                                                    title="匯出所有記帳紀錄 (CSV)"
+                                                                >
+                                                                    <Download size={16} />
+                                                                </button>
                                                             </div>
                                                             
                                                             {/* 篩選器區域 */}
@@ -2564,7 +2658,6 @@
                                                             ))
                                                         )}
 
-                                                        {/* Modified: Transaction List Moved to Bottom */}
                                                         <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee] shadow-sm">
                                                             <div className="mb-2 text-xs font-bold text-gray-400">詳細列表</div>
                                                             {sortedExpensesByDate.length === 0 ? (
@@ -2629,7 +2722,6 @@
                                                 defaultValues={editingExpense}
                                             />
                                             <ImageModal src={modals.viewingImage} onClose={()=>setModals({...modals, viewingImage:null})} />
-                                            <TransactionDetailModal transaction={modals.transaction} onClose={()=>setModals({...modals, transaction:null})} onViewImage={u=>setModals({...modals, viewingImage:u})} />
                                             {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
                                             <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
                                             <MemberManagementModal 
