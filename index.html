@@ -1049,7 +1049,7 @@
                                 <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">日期</label><input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                                 <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">時間</label><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                             </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">品名</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
+                            <div><label className="text-xs text-gray-400 font-bold block">品名</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
                             
                             <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={2} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm resize-none text-gray-700 border border-[#eeeeee]" /></div>
                             <div className="flex gap-2">
