@@ -894,28 +894,28 @@
                                         </div>
                                         
                                         <div className="flex flex-col gap-1">
-                                        <div className="flex gap-2 items-stretch">
-                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[3] overflow-hidden">
-                                                <Phone size={10} className="text-green-600 flex-shrink-0" />
-                                                <AutoSaveInput type="text" readOnly={!isOwner} placeholder="電話" value={item.phone} onSave={(val) => onUpdate(item.id, 'phone', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
+                                            <div className="flex gap-2 items-stretch">
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[3] overflow-hidden">
+                                                    <Phone size={10} className="text-green-600 flex-shrink-0" />
+                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="電話" value={item.phone} onSave={(val) => onUpdate(item.id, 'phone', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
+                                                </div>
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[7] overflow-hidden">
+                                                    <MapPin size={10} className="text-red-500 flex-shrink-0" />
+                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="地址" value={item.address} onSave={(val) => onUpdate(item.id, 'address', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
+                                                    <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={10} /></button>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[7] overflow-hidden">
-                                                <MapPin size={10} className="text-red-500 flex-shrink-0" />
-                                                <AutoSaveInput type="text" readOnly={!isOwner} placeholder="地址" value={item.address} onSave={(val) => onUpdate(item.id, 'address', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
-                                                <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={10} /></button>
+                                            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-0.5">
+                                                    {item.photoUrls?.map((p, i) => {
+                                                        // FIX: Handle null photos from dirty data
+                                                        if (!p) return null;
+                                                        const url = typeof p === 'string' ? p : p.url;
+                                                        const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
+                                                        const canDelete = isOwner || (currentMember && uploader === currentMember.name);
+                                                        return ( <div key={i} className="relative flex-shrink-0"> <img src={url} className="w-10 h-10 object-cover rounded-lg border border-yellow-200 cursor-zoom-in" onClick={() => onViewImage(url)} /> {canDelete && <button onClick={() => onPhotoDelete(item.id, url, 'accom')} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"><X size={10} /></button>} </div> );
+                                                    })}
+                                                    <button onClick={() => onPhotoUpload(item.id)} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-0.5">
-                                                {item.photoUrls?.map((p, i) => {
-                                                    // FIX: Handle null photos from dirty data
-                                                    if (!p) return null;
-                                                    const url = typeof p === 'string' ? p : p.url;
-                                                    const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
-                                                    const canDelete = isOwner || (currentMember && uploader === currentMember.name);
-                                                    return ( <div key={i} className="relative flex-shrink-0"> <img src={url} className="w-10 h-10 object-cover rounded-lg border border-yellow-200 cursor-zoom-in" onClick={() => onViewImage(url)} /> {canDelete && <button onClick={() => onPhotoDelete(item.id, url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"><X size={10} /></button>} </div> );
-                                                })}
-                                                <button onClick={() => onPhotoUpload(item.id)} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
-                                        </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1189,7 +1189,7 @@
             );
         };
 
-        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, onExportExpenses }) => {
+        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, onExportExpenses, isOffline }) => {
             const datesList = useMemo(() => tripData ? getDatesArray(tripData.startDate, tripData.endDate) : [], [tripData]);
             
             return (
@@ -1324,7 +1324,6 @@
             const [authError, setAuthError] = useState(null);
             const [connectionTimeout, setConnectionTimeout] = useState(false); 
             const [isMenuOpen, setIsMenuOpen] = useState(false); // Add missing state
-            const [setupTab, setSetupTab] = useState('create'); // Add missing state
             
             // Firebase states (default to offline/local)
             const [isOffline, setIsOffline] = useState(true);
@@ -1559,9 +1558,9 @@
                                 } else {
                                      // Not found anywhere
                                      if (!isOffline) {
-                                         alert("找不到此旅程 ID，請確認 ID 是否正確。");
-                                         setTripId('');
-                                         setView('landing');
+                                      alert("找不到此旅程 ID，請確認 ID 是否正確。");
+                                      setTripId('');
+                                      setView('landing');
                                      }
                                 }
                             }
@@ -2377,7 +2376,7 @@
                                                                             textToCopy = JSON.stringify(bundle);
                                                                             alertMsg = "已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。";
                                                                     } catch (e) {
-                                                                            console.error("Bundle error", e);
+                                                                        console.error("Bundle error", e);
                                                                     }
                                                                 }
                                                             }
@@ -2468,7 +2467,7 @@
                                         ) : (
                                         <>
                                             {/* PASS EXPORT HANDLER TO HEADER */}
-                                            <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} onManageMembers={() => setModals({ ...modals, members: true })} onOpenFirebase={() => setView('landing')} isOffline={isOffline} onExportExpenses={handleExportExpenses} />
+                                            <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} onManageMembers={() => setModals({ ...modals, members: true })} isOffline={isOffline} onExportExpenses={handleExportExpenses} />
                                             
                                             <div className="flex-1 overflow-y-auto p-4 pb-24">
                                                 {view === 'planner' ? (
@@ -2486,41 +2485,41 @@
                                                                 const isExpanded = expandedId === act.id;
                                                                 return (
                                                                 <div key={act.id} className={`bg-[#F5FDFC] rounded-2xl border overflow-hidden ${act.transport==='expense'?'border-orange-100 bg-orange-50/30':'border-[#eeeeee]'}`}>
-                                                                            <div className="flex items-stretch min-h-[2.8rem] cursor-pointer" onClick={()=>setExpandedId(isExpanded?null:act.id)}>
-                                                                                <div className="w-16 flex flex-col items-center justify-center border-r border-gray-100 bg-white/50 py-1 px-1">
-                                                                                    <div onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.time} onSave={v=>updateActivity(act.id,'time',v)} readOnly={!isOwner} className="font-bold text-sm text-center bg-transparent w-full outline-none p-0 text-gray-700" /></div>
-                                                                                    {act.transport === 'expense' ? <div className="text-[10px] text-orange-400 flex items-center gap-1 mt-0.5"><DollarSign size={10}/>消費</div> : <div className="flex items-center justify-center gap-1 mt-0.5 w-full"></div>}
-                                                                                </div>
-                                                                                <div className="flex-1 flex items-center px-4 overflow-hidden"><div className="w-full" onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner} className="font-bold text-lg bg-transparent w-full text-gray-800" /></div></div>
-                                                                                <div className="flex items-center pr-3 gap-2">
-                                                                                    {act.transport !== 'expense' && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={16} /></button>}
-                                                                                    <ChevronDown size={20} className={`text-gray-300 transition ${isExpanded?'rotate-180':''}`}/>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className={`transition-all ${isExpanded?'max-h-[500px]':'max-h-0'}`}>
-                                                                                <div className="p-4 border-t border-gray-100 bg-[#F5FDFC] space-y-3">
-                                                                                    <AutoSaveInput value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-sm bg-[#E2E2E2] rounded-xl p-2 text-gray-700 border border-[#eeeeee]" />
-                                                                                    {act.transport!=='expense' && <div className="grid grid-cols-2 gap-2">
-                                                                                        <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-sm bg-transparent w-full text-gray-700"/></div>
-                                                                                        <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-sm bg-transparent w-full text-gray-700"/></div>
-                                                                                    </div>}
-                                                                                    {act.transport==='expense' && <div className="flex gap-2 bg-orange-50 p-2 rounded-xl border border-orange-100"><div className="flex-1 text-orange-600 font-bold">${act.cost}</div><div className="flex-1">{act.currency}</div><div className="flex-1">{act.category}</div><div className="text-xs text-gray-400 self-center">{act.payer}付</div></div>}
-                                                                                    <div>
-                                                                                        <div className="flex justify-between items-center mb-2"><label className="text-xs font-bold text-gray-400">照片</label>
-                                                                                            <div className="flex gap-2">
-                                                                                                {act.transport!=='expense' && isOwner && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
-                                                                                                {act.transport==='expense' && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingExpense({...act, originalDate: selectedDate}); setModals({ ...modals, expense: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
-                                                                                                {(isOwner || (act.transport === 'expense' && act.createdBy === currentMember.name)) && <button onClick={() => act.transport==='expense' ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                        <div className="flex gap-2 overflow-x-auto">{act.photoUrls?.map((p,i) => { 
-                                                                                            // FIX: Guard clause for dirty data (null photos)
-                                                                                            if (!p) return null;
-                                                                                            const url = typeof p === 'string' ? p : p.url; 
-                                                                                            return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}<button onClick={()=>{setUploadTarget({type:'activity', id:act.id}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={16}/></button></div>
+                                                                    <div className="flex items-stretch min-h-[2.8rem] cursor-pointer" onClick={()=>setExpandedId(isExpanded?null:act.id)}>
+                                                                        <div className="w-16 flex flex-col items-center justify-center border-r border-gray-100 bg-white/50 py-1 px-1">
+                                                                            <div onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.time} onSave={v=>updateActivity(act.id,'time',v)} readOnly={!isOwner} className="font-bold text-sm text-center bg-transparent w-full outline-none p-0 text-gray-700" /></div>
+                                                                            {act.transport === 'expense' ? <div className="text-[10px] text-orange-400 flex items-center gap-1 mt-0.5"><DollarSign size={10}/>消費</div> : <div className="flex items-center justify-center gap-1 mt-0.5 w-full"></div>}
+                                                                        </div>
+                                                                        <div className="flex-1 flex items-center px-4 overflow-hidden"><div className="w-full" onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner} className="font-bold text-lg bg-transparent w-full text-gray-800" /></div></div>
+                                                                        <div className="flex items-center pr-3 gap-2">
+                                                                            {act.transport !== 'expense' && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={16} /></button>}
+                                                                            <ChevronDown size={20} className={`text-gray-300 transition ${isExpanded?'rotate-180':''}`}/>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className={`transition-all ${isExpanded?'max-h-[500px]':'max-h-0'}`}>
+                                                                        <div className="p-4 border-t border-gray-100 bg-[#F5FDFC] space-y-3">
+                                                                            <AutoSaveInput value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-sm bg-[#E2E2E2] rounded-xl p-2 text-gray-700 border border-[#eeeeee]" />
+                                                                            {act.transport!=='expense' && <div className="grid grid-cols-2 gap-2">
+                                                                                <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-sm bg-transparent w-full text-gray-700"/></div>
+                                                                                <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-sm bg-transparent w-full text-gray-700"/></div>
+                                                                            </div>}
+                                                                            {act.transport==='expense' && <div className="flex gap-2 bg-orange-50 p-2 rounded-xl border border-orange-100"><div className="flex-1 text-orange-600 font-bold">${act.cost}</div><div className="flex-1">{act.currency}</div><div className="flex-1">{act.category}</div><div className="text-xs text-gray-400 self-center">{act.payer}付</div></div>}
+                                                                            <div>
+                                                                                <div className="flex justify-between items-center mb-2"><label className="text-xs font-bold text-gray-400">照片</label>
+                                                                                    <div className="flex gap-2">
+                                                                                        {act.transport!=='expense' && isOwner && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
+                                                                                        {act.transport==='expense' && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingExpense({...act, originalDate: selectedDate}); setModals({ ...modals, expense: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
+                                                                                        {(isOwner || (act.transport === 'expense' && act.createdBy === currentMember.name)) && <button onClick={() => act.transport==='expense' ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>}
                                                                                     </div>
                                                                                 </div>
+                                                                                <div className="flex gap-2 overflow-x-auto">{act.photoUrls?.map((p,i) => { 
+                                                                                    // FIX: Guard clause for dirty data (null photos)
+                                                                                    if (!p) return null;
+                                                                                    const url = typeof p === 'string' ? p : p.url; 
+                                                                                    return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}<button onClick={()=>{setUploadTarget({type:'activity', id:act.id}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={16}/></button></div>
                                                                             </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             )})}
                                                         </div>
@@ -2618,42 +2617,42 @@
                                                         ) : (
                                                             expenseStatsByCurrency.map(stat => (
                                                                 <div key={stat.currency} className="space-y-4 pt-4 mt-4 border-t-2 border-dashed border-gray-200 first:border-0 first:mt-0 first:pt-0">
-                                                                        <div className="flex items-center gap-2 px-1 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
-                                                                            <div className={`h-6 w-1.5 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
-                                                                            <h4 className="font-bold text-gray-800 text-lg flex-1">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
-                                                                        </div>
+                                                                    <div className="flex items-center gap-2 px-1 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+                                                                        <div className={`h-6 w-1.5 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
+                                                                        <h4 className="font-bold text-gray-800 text-lg flex-1">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
+                                                                    </div>
+                                                                    
+                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
+                                                                        <SimplePieChart data={stat.pieData} />
                                                                         
-                                                                        <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                            <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
-                                                                            <SimplePieChart data={stat.pieData} />
-                                                                            
-                                                                            {/* New: Category Breakdown List */}
-                                                                            <div className="mt-6 space-y-2">
-                                                                                {stat.pieData.map(item => (
-                                                                                    <div key={item.category} className="flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
-                                                                                            <span className="text-gray-600 font-medium">{item.category}</span>
-                                                            v                                                         </div>
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="text-gray-400 text-[10px]">({Math.round((item.value / stat.total) * 100)}%)</span>
-                                                                                            <span className="font-bold text-gray-700 text-sm">${item.value.toLocaleString()}</span>
-                                                                                        </div>
+                                                                        {/* New: Category Breakdown List */}
+                                                                        <div className="mt-6 space-y-2">
+                                                                            {stat.pieData.map(item => (
+                                                                                <div key={item.category} className="flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
+                                                                                        <span className="text-gray-600 font-medium">{item.category}</span>
                                                                                     </div>
-                                                                                ))}
-                                                                            </div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="text-gray-400 text-[10px]">({Math.round((item.value / stat.total) * 100)}%)</span>
+                                                                                        <span className="font-bold text-gray-700 text-sm">${item.value.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
-                                                                        
-                                                                        <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                            <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
-                                                                            <SimpleBarChart data={stat.barData} />
-                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
+                                                                        <SimpleBarChart data={stat.barData} />
+                                                                    </div>
 
-                                                                        {/* Total Expense */}
-                                                                        <div className="bg-[#FFF3E0] p-4 rounded-xl border border-[#FFE0B2] flex justify-between items-center shadow-sm">
-                                                                            <span className="font-bold text-[#D68C68] text-sm">總支出 ({stat.currency})</span>
-                                                                            <span className="font-bold text-[#D68C68] text-2xl">${stat.total.toLocaleString()}</span>
-                                                                        </div>
+                                                                    {/* Total Expense */}
+                                                                    <div className="bg-[#FFF3E0] p-4 rounded-xl border border-[#FFE0B2] flex justify-between items-center shadow-sm">
+                                                                        <span className="font-bold text-[#D68C68] text-sm">總支出 ({stat.currency})</span>
+                                                                        <span className="font-bold text-[#D68C68] text-2xl">${stat.total.toLocaleString()}</span>
+                                                                    </div>
                                                                 </div>
                                                             ))
                                                         )}
@@ -2721,6 +2720,13 @@
                                                 currentMember={currentMember}
                                                 defaultValues={editingExpense}
                                             />
+                                            {modals.transaction && (
+                                                <TransactionDetailModal 
+                                                    transaction={modals.transaction} 
+                                                    onClose={() => setModals({ ...modals, transaction: null })} 
+                                                    onViewImage={(url) => setModals({ ...modals, viewingImage: url })} 
+                                                />
+                                            )}
                                             <ImageModal src={modals.viewingImage} onClose={()=>setModals({...modals, viewingImage:null})} />
                                             {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
                                             <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
