@@ -1731,6 +1731,8 @@
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
+                         // FIX: Define db instance before using it in updateDoc
+                         const db = getFirestore(apps[0]);
                          updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) });
                      }
                 }
@@ -1743,6 +1745,8 @@
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
+                         // FIX: Define db instance before using it in setDoc
+                         const db = getFirestore(apps[0]);
                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData));
                      }
                 }
