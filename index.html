@@ -859,22 +859,29 @@
                                             </div>
 
                                             {/* Right Column */}
-                                            {/* Modified: Reverted width from w-[48%] back to w-[40%] per user request */}
-                                            <div className="w-[40%] flex flex-col gap-1">
+                                            {/* Modified: Adjusted width to 44% and added z-index to inputs to ensure clickability */}
+                                            <div className="w-[44%] flex flex-col gap-1">
                                                 {/* Check-in Box */}
                                                 <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg relative">
                                                     <LogIn size={10} className="text-green-600 flex-shrink-0" />
                                                     <input 
                                                         type="date" 
                                                         value={item.checkInDate || ''} 
-                                                        onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
+                                                        onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()} // FIX: Stop click propagation
                                                         disabled={!isOwner} 
-                                                        // Modified: Removed text-center to prevent text clipping in narrow width, reduced min-width slightly
-                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-[50px] font-bold text-gray-600 border-none cursor-pointer p-0" 
+                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-[60px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" 
                                                     />
                                                     <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
-                                                    {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                    <select 
+                                                        value={item.checkInTime || '15:00'} 
+                                                        onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} 
+                                                        onClick={(e) => e.stopPropagation()} // FIX: Stop click propagation
+                                                        disabled={!isOwner} 
+                                                        className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10"
+                                                    >
+                                                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                                    </select>
                                                 </div>
 
                                                 {/* Check-out Box */}
@@ -884,13 +891,20 @@
                                                         type="date" 
                                                         value={item.checkOutDate || ''} 
                                                         onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} 
+                                                        onClick={(e) => e.stopPropagation()} // FIX: Stop click propagation
                                                         disabled={!isOwner} 
-                                                        // Modified: Removed text-center to prevent text clipping in narrow width, reduced min-width slightly
-                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-[50px] font-bold text-gray-600 border-none cursor-pointer p-0" 
+                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-[60px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" 
                                                     />
                                                     <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
-                                                    {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                                    <select value={item.checkOutTime || '10:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                    <select 
+                                                        value={item.checkOutTime || '10:00'} 
+                                                        onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} 
+                                                        onClick={(e) => e.stopPropagation()} // FIX: Stop click propagation
+                                                        disabled={!isOwner} 
+                                                        className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10"
+                                                    >
+                                                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
@@ -2048,7 +2062,8 @@
                 // 2. Logic to Sync to other dates
                 
                 // --- Determine the fields that need synchronization ---
-                const fieldsToSync = ['name', 'bookingCode', 'note', 'phone', 'address', 'photoUrls'];
+                // FIX: Added time fields to sync list so changes reflect immediately
+                const fieldsToSync = ['name', 'bookingCode', 'note', 'phone', 'address', 'photoUrls', 'checkInTime', 'checkOutTime'];
                 const isFieldToSync = fieldsToSync.includes(field);
                 
                 // --- Determine range changes ---
