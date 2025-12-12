@@ -395,38 +395,16 @@
                                         className="flex-1 p-2 bg-[#E2E2E2] border border-gray-200 rounded-lg text-gray-700 font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-sm" 
                                     />
                                     <button 
-                                        onClick={handleJoinClick} 
-                                        className="bg-gray-800 text-white px-4 rounded-lg font-bold hover:bg-gray-700 transition-all text-sm whitespace-nowrap"
+                                        onClick={handleJoinClick}
+                                        className="bg-[#0ABAB5] text-white p-2 rounded-lg hover:bg-[#008985] transition-colors"
                                     >
-                                        讀取
+                                        <ArrowRight size={20} />
                                     </button>
                                 </div>
+                                <p className="text-[10px] text-gray-400 text-center mt-2">
+                                    若您已收到朋友的旅程 ID，請直接輸入並加入。
+                                </p>
                             </div>
-
-                            {recentTrips.length > 0 && (
-                                <div>
-                                    <h4 className="text-xs font-bold text-gray-400 mb-2">近期紀錄</h4>
-                                    <div className="space-y-2">
-                                        {recentTrips.map((t) => (
-                                            <div key={t.id} onClick={() => onJoin(t.id)} className="group bg-[#EDF7F6] border border-[#eeeeee] rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-[#0ABAB5] hover:shadow-md transition-all">
-                                                <div className="bg-[#E0F2F1] rounded-lg p-2 w-10 h-10 flex flex-col items-center justify-center text-[#00695C] border border-[#B2DFDB]">
-                                                    <span className="text-[8px] font-bold uppercase">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[0] : 'N/A'}月</span>
-                                                    <span className="text-sm font-bold leading-none">{t.dateRange ? t.dateRange.split('-')[0].trim().split('/')[1] : '--'}</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-gray-700 text-sm truncate">{t.destination}</h4>
-                                                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">{t.dateRange}</p>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <button onClick={(e) => onDeleteTrip(t.id, e)} className="p-1.5 text-gray-300 hover:text-red-400 transition-colors">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
 
@@ -856,7 +834,7 @@
                                                 </div>
                                             </div>
 
-                                            /* Right Column */
+                                            {/* Right Column */}
                                             {/* Modified: Increased width from w-[36%] to w-[40%] to prevent date cutoff */}
                                             <div className="w-[40%] flex flex-col gap-1">
                                                 {/* Check-in Box */}
@@ -976,10 +954,14 @@
             );
         };
 
-        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues, currentMember, selectedDate }) => {
+        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues, currentMember, selectedDate, onUpdateCategories }) => {
             const [formData, setFormData] = useState({ date: selectedDate, time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: 'JPY', payer: '我', category: '', photoUrls: [] });
             const [confirm, setConfirm] = useState({ open: false, idx: null });
             const fileRef = useRef(null);
+            
+            // New state for adding category
+            const [isAddingCat, setIsAddingCat] = useState(false);
+            const [newCatName, setNewCatName] = useState("");
             
             useEffect(() => {
                  if (isOpen) {
@@ -1004,6 +986,9 @@
                              date: selectedDate
                          }); 
                      }
+                     // Reset add category state when opening modal
+                     setIsAddingCat(false);
+                     setNewCatName("");
                  }
             }, [isOpen, defaultValues, tripData, currentMember, selectedDate]);
 
@@ -1063,24 +1048,83 @@
                                 <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">費用與記帳</span></div>
                                 <div className="flex gap-2 mb-2 items-start">
                                     <div className="flex-1 flex flex-col gap-2">
-                                        <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee]">
+                                        {/* Cost Input - Wrapped for styling match */}
+                                        <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee] h-[38px]">
                                             <span className="text-xs text-gray-400">$</span>
-                                            <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額 (選填)" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700" />
+                                            <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700 placeholder-gray-400" />
                                         </div>
                                         
-                                        {/* Category - Fixed Display */}
+                                        {/* Category - Fixed Display with Add Button */}
                                         <div>
-                                            <label className="text-[10px] text-gray-400 font-bold block mb-1">分類</label>
-                                            <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs font-bold text-gray-700 border border-[#eeeeee]">{/* tripData.expenseCategories已經在useEffect中處理過，這裡只需要確保map能正常執行 */(tripData.expenseCategories || []).map(c=><option key={c} value={c}>{c}</option>)}</select>
+                                            {/* Header with fixed height to match Payer header */}
+                                            <div className="flex justify-between items-center mb-1 h-[16px]">
+                                                <label className="text-[10px] text-gray-400 font-bold">分類</label>
+                                                <button onClick={() => setIsAddingCat(!isAddingCat)} className="text-[10px] text-[#6A8E83] hover:text-[#557269] flex items-center gap-1 font-bold">
+                                                    {isAddingCat ? '取消' : '+ 新增'}
+                                                </button>
+                                            </div>
+                                            {isAddingCat ? (
+                                                <div className="flex gap-1 h-[34px]">
+                                                    <input 
+                                                        value={newCatName}
+                                                        onChange={e => setNewCatName(e.target.value)}
+                                                        placeholder="新分類"
+                                                        className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee] outline-none focus:ring-1 focus:ring-[#6A8E83]"
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                if (newCatName.trim()) {
+                                                                    const currentCats = tripData.expenseCategories || [];
+                                                                    if (!currentCats.includes(newCatName.trim())) {
+                                                                        onUpdateCategories([...currentCats, newCatName.trim()]);
+                                                                        setFormData({ ...formData, category: newCatName.trim() });
+                                                                    }
+                                                                    setNewCatName("");
+                                                                    setIsAddingCat(false);
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button 
+                                                        onClick={() => {
+                                                            if (newCatName.trim()) {
+                                                                const currentCats = tripData.expenseCategories || [];
+                                                                if (!currentCats.includes(newCatName.trim())) {
+                                                                    onUpdateCategories([...currentCats, newCatName.trim()]);
+                                                                    setFormData({ ...formData, category: newCatName.trim() });
+                                                                }
+                                                                setNewCatName("");
+                                                                setIsAddingCat(false);
+                                                            }
+                                                        }}
+                                                        className="bg-[#6A8E83] text-white px-2 rounded-lg text-xs"
+                                                    >
+                                                        <Check size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
+                                                    {/* tripData.expenseCategories已經在useEffect中處理過，這裡只需要確保map能正常執行 */}
+                                                    {(tripData.expenseCategories || []).map(c=><option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="w-[35%] flex flex-col gap-2">
-                                        <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select></div>
+                                        {/* Currency Select - Wrapped to match Cost Input height */}
+                                        <div className="bg-[#E2E2E2] rounded-xl px-1 border border-[#eeeeee] h-[38px] flex items-center">
+                                            <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-transparent p-1 text-sm font-bold text-gray-700 outline-none border-none">
+                                                {currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}
+                                            </select>
+                                        </div>
                                         
                                         {/* Payer - Fixed Display */}
                                         <div>
-                                            <label className="text-[10px] text-gray-400 font-bold block mb-1">付款人</label>
-                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs font-bold text-gray-700 border border-[#eeeeee]">{tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}</select>
+                                            <div className="flex justify-between items-center mb-1 h-[16px]">
+                                                <label className="text-[10px] text-gray-400 font-bold block">付款人</label>
+                                            </div>
+                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">{tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}</select>
                                         </div>
                                     </div>
                                 </div>
@@ -1104,6 +1148,7 @@
                         </div>
                     </div>
                     <ConfirmModal isOpen={confirm.open} message="確定刪除照片？" onConfirm={() => { const n = [...formData.photoUrls]; n.splice(confirm.idx, 1); setFormData({...formData, photoUrls: n}); setConfirm({open:false}); }} onCancel={() => setConfirm({open:false})} />
+                </div>
                 </>
             );
         };
@@ -2474,9 +2519,22 @@
                                                     <>
                                                         <div className="grid grid-cols-2 gap-3 mb-4">
                                                             {/* FIX: Pass selectedDate to ActivityModal */}
-                                                            {isOwner && <button onClick={()=>setModals({...modals, activity:true})} className="p-3 rounded-2xl bg-[#6A8E83] text-white font-bold flex justify-center items-center gap-2 border border-[#6A8E83]"><Plus size={18}/> 新增行程</button>}
-                                                            <button onClick={()=>setModals({...modals, expense:true})} className={`p-3 rounded-2xl bg-[#D68C68] text-white font-bold flex justify-center items-center gap-2 border border-[#D68C68] ${!isOwner ? 'col-span-2' : ''}`}><DollarSign size={18}/> 記帳</button>
+                                                            {isOwner && <button onClick={()=>setModals({...modals, activity:true})} className="py-2 rounded-xl bg-[#6A8E83] text-white font-bold flex justify-center items-center gap-2 border border-[#6A8E83] shadow-sm active:scale-95 transition-transform"><Plus size={18}/> 新增行程</button>}
+                                                            <button onClick={()=>setModals({...modals, expense:true})} className={`py-2 rounded-xl bg-[#D68C68] text-white font-bold flex justify-center items-center gap-2 border border-[#D68C68] shadow-sm active:scale-95 transition-transform ${!isOwner ? 'col-span-2' : ''}`}><DollarSign size={18}/> 記帳</button>
                                                         </div>
+
+                                                        {/* Day Total Summary */}
+                                                        {(() => {
+                                                            const dayCost = sortedActivities.reduce((sum, act) => sum + (parseFloat(act.cost) || 0), 0);
+                                                            if (dayCost > 0) return (
+                                                                <div className="flex justify-end items-center gap-2 mb-2 px-1">
+                                                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">預估支出</span>
+                                                                    <span className="text-sm font-bold text-gray-600">${dayCost.toLocaleString()}</span>
+                                                                </div>
+                                                            );
+                                                            return null;
+                                                        })()}
+
                                                         {/* Fix: Added unique keys to FlightCards to prevent state leakage */}
                                                         {selectedDate === tripData.startDate && <FlightCard key="outbound" label="去程" icon={Plane} data={tripData.flights.outbound} onUpdate={(f,v)=>updateTrip('flights', {...tripData.flights, outbound: {...tripData.flights.outbound, [f]:v}})} isOwner={isOwner} />}
                                                         {selectedDate === tripData.endDate && <FlightCard key="inbound" label="回程" icon={Plane} data={tripData.flights.inbound} onUpdate={(f,v)=>updateTrip('flights', {...tripData.flights, inbound: {...tripData.flights.inbound, [f]:v}})} isOwner={isOwner} />}
@@ -2709,7 +2767,7 @@
                                                 )}
                                             </div>
 
-                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} selectedDate={selectedDate} />
+                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} selectedDate={selectedDate} onUpdateCategories={c=>updateTrip('expenseCategories',c)} />
                                             <ExpenseModal 
                                                 isOpen={modals.expense} 
                                                 onClose={()=> { setModals({...modals, expense:false}); setEditingExpense(null); }} 
