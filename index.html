@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Good Travel Plan</title>
+    <title>Travel Plan</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="importmap">
@@ -321,7 +321,7 @@
                 <div className="flex flex-col h-full bg-[#F5FDFC] overflow-y-auto no-scrollbar">
                     <div className="flex-1 flex flex-col p-8 max-w-md mx-auto w-full">
                         <div className="text-center mb-6">
-                            <h1 className="text-3xl font-bold text-[#0ABAB5] mb-2">Good Travel Plan</h1>
+                            <h1 className="text-3xl font-bold text-[#0ABAB5] mb-2">Travel Plan</h1>
                             <p className="text-gray-500 text-sm">設定雲端連線或讀取本機行程</p>
                         </div>
 
@@ -385,10 +385,9 @@
                         <div className="border-t border-gray-200 pt-6">
                             
                             <div className="bg-gray-100 border border-gray-100 rounded-xl p-3 mb-4 shadow-sm">
-                                <label className="text-xs font-bold text-gray-400 block mb-2">輸入旅程 ID</label>
                                 <div className="flex gap-2">
                                     <input 
-                                        placeholder="例如：x9z8y7" 
+                                        placeholder="輸入旅程 ID 例如：x9z8y7" 
                                         value={joinId} 
                                         onChange={e => setJoinId(e.target.value)} 
                                         onKeyDown={(e) => e.key === 'Enter' && handleJoinClick()}
@@ -401,10 +400,35 @@
                                         <ArrowRight size={20} />
                                     </button>
                                 </div>
-                                <p className="text-[10px] text-gray-400 text-center mt-2">
-                                    若您已收到朋友的旅程 ID，請直接輸入並加入。
-                                </p>
                             </div>
+
+                            {/* Recent Trips Section - Restored */}
+                            {recentTrips.length > 0 && (
+                                <div className="mt-8">
+                                    <h3 className="text-xs font-bold text-gray-400 mb-3 flex items-center gap-2 uppercase tracking-wider"><History size={14}/> 近期瀏覽</h3>
+                                    <div className="space-y-2">
+                                        {recentTrips.map(trip => (
+                                            <div key={trip.id} onClick={() => onJoin(trip.id)} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center cursor-pointer hover:border-[#0ABAB5] hover:shadow-md transition-all group">
+                                                <div>
+                                                    <div className="font-bold text-gray-700 text-sm flex items-center gap-2">
+                                                        {trip.destination || '未命名行程'}
+                                                        {/* 簡單判斷是否為純本機 ID 格式 (trip_開頭) */}
+                                                        {trip.id.toString().startsWith('trip_') && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 rounded border border-gray-200">本機</span>}
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-400 mt-0.5">{trip.dateRange}</div>
+                                                </div>
+                                                <button 
+                                                    onClick={(e) => onDeleteTrip(trip.id, e)} 
+                                                    className="p-2 text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                                    title="移除紀錄"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -835,38 +859,38 @@
                                             </div>
 
                                             {/* Right Column */}
-                                            {/* Modified: Increased width from w-[36%] to w-[40%] to prevent date cutoff */}
+                                            {/* Modified: Reverted width from w-[48%] back to w-[40%] per user request */}
                                             <div className="w-[40%] flex flex-col gap-1">
                                                 {/* Check-in Box */}
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg relative">
                                                     <LogIn size={10} className="text-green-600 flex-shrink-0" />
                                                     <input 
                                                         type="date" 
                                                         value={item.checkInDate || ''} 
                                                         onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
                                                         disabled={!isOwner} 
-                                                        // Modified: Increased font size from text-[10px] to text-xs
-                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
+                                                        // Modified: Kept min-width and cursor-pointer to ensure usability even at 40% width
+                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-[60px] text-center font-bold text-gray-600 border-none cursor-pointer p-0.5" 
                                                     />
                                                     <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
                                                     {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                                                 </div>
 
                                                 {/* Check-out Box */}
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg relative">
                                                     <LogOutIcon size={10} className="text-red-500 flex-shrink-0" />
                                                     <input 
                                                         type="date" 
                                                         value={item.checkOutDate || ''} 
                                                         onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} 
                                                         disabled={!isOwner} 
-                                                        // Modified: Increased font size from text-[10px] to text-xs
-                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-0 text-center font-bold text-gray-600 p-0 border-none" 
+                                                        // Modified: Kept min-width and cursor-pointer
+                                                        className="text-[10px] bg-transparent outline-none flex-1 min-w-[60px] text-center font-bold text-gray-600 border-none cursor-pointer p-0.5" 
                                                     />
                                                     <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
                                                     {/* Modified: Increased font size from text-[10px] to text-xs */}
-                                                    <select value={item.checkOutTime || '11:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                                                    <select value={item.checkOutTime || '10:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                                                 </div>
                                             </div>
                                         </div>
@@ -2390,7 +2414,7 @@
                                     {/* Menu Overlay */}
                                     <div className={`absolute inset-0 z-50 bg-black/50 ${!isMenuOpen && 'hidden'}`} onClick={()=>setIsMenuOpen(false)}>
                                         <div className="w-72 bg-[#F5FDFC] h-full p-4" onClick={e=>e.stopPropagation()}>
-                                            <h2 className="text-lg font-bold text-[#0ABAB5] mb-4">Good Travel Plan</h2>
+                                            <h2 className="text-lg font-bold text-[#0ABAB5] mb-4">Travel Plan</h2>
                                             
                                             {/* Trip ID Display */}
                                             {tripData && view !== 'setup' && (
