@@ -50,7 +50,7 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download } from 'lucide-react';
+        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
@@ -846,17 +846,54 @@
                                 {/* Details - Collapsible */}
                                 <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                     <div className="pt-1 pb-0.5 space-y-1">
-                                        {/* Modified: Removed Right Column (Check-in/Check-out Boxes) as requested */}
-                                        <div className="flex gap-1 mb-1">
-                                            {/* Left Column - Now takes full width */}
-                                            <div className="flex-1 flex flex-col gap-1 min-w-0 justify-center">
-                                                <div className="pl-1">
-                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="訂房編號" value={item.bookingCode} onSave={(val) => onUpdate(item.id, 'bookingCode', val)} className="text-xs text-gray-500 bg-transparent outline-none w-full"/>
-                                                </div>
-                                                <div className="pl-1">
-                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="備註 (Wifi/密碼...)" value={item.note} onSave={(val) => onUpdate(item.id, 'note', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1"/>
-                                                </div>
+                                        {/* Modified: Booking Code row with Check-in Box on the right */}
+                                        <div className="flex gap-1 mb-1 items-center px-1">
+                                            {/* Booking Code Input */}
+                                            <div className="flex-1 min-w-0">
+                                                <AutoSaveInput 
+                                                    type="text" 
+                                                    readOnly={!isOwner} 
+                                                    placeholder="訂房編號" 
+                                                    value={item.bookingCode} 
+                                                    onSave={(val) => onUpdate(item.id, 'bookingCode', val)} 
+                                                    className="text-xs text-gray-500 bg-transparent outline-none w-full"
+                                                />
                                             </div>
+
+                                            {/* Check-in Date & Time Box */}
+                                            <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg flex-shrink-0">
+                                                <LogIn size={10} className="text-green-600 flex-shrink-0" />
+                                                <input 
+                                                    type="date" 
+                                                    value={item.checkInDate || ''} 
+                                                    onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    disabled={!isOwner} 
+                                                    className="text-[10px] bg-transparent outline-none w-[80px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" 
+                                                />
+                                                <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
+                                                <select 
+                                                    value={item.checkInTime || '15:00'} 
+                                                    onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} 
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    disabled={!isOwner} 
+                                                    className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10"
+                                                >
+                                                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Note Input Row */}
+                                        <div className="px-1">
+                                            <AutoSaveInput 
+                                                type="text" 
+                                                readOnly={!isOwner} 
+                                                placeholder="備註 (Wifi/密碼...)" 
+                                                value={item.note} 
+                                                onSave={(val) => onUpdate(item.id, 'note', val)} 
+                                                className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1"
+                                            />
                                         </div>
                                         
                                         <div className="flex flex-col gap-1">
@@ -951,7 +988,6 @@
             const [isAddingCat, setIsAddingCat] = useState(false);
             const [newCatName, setNewCatName] = useState("");
             
-            // FIX: Removed unnecessary dependencies from useEffect to prevent form reset during typing or background updates
             useEffect(() => {
                  if (isOpen) {
                      if (defaultValues) { 
@@ -979,7 +1015,7 @@
                      setIsAddingCat(false);
                      setNewCatName("");
                  }
-            }, [isOpen, defaultValues]); // FIX: Reduced dependency array to only what triggers a mode change
+            }, [isOpen, defaultValues, tripData, currentMember, selectedDate]);
 
             // Effect: Auto-set category based on transport if category is empty
             useEffect(() => {
@@ -1864,58 +1900,49 @@
                 if(idx>=0) { acts[idx][field]=val; updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); } 
             };
 
-            // FIX: Rewritten to be robust and clear for Create/Update operations
+            // FIX: Modified to support cross-date activity saving
             const handleSaveActivity = (data) => {
-                if (!isOwner) {
-                    alert("您沒有權限修改此行程");
-                    return;
-                }
+                if (!isOwner) return; 
                 
-                const targetDate = data.date || selectedDate; // Fallback
+                const targetDate = data.date;
+                // For editing, if defaultValues exists, use the original date and ID
+                const oldDate = editingActivity?.date || selectedDate;
+                const activityId = editingActivity?.id || generateId();
+                const activityCreator = editingActivity?.createdBy || currentMember.name;
+
                 const activityData = { ...data };
-                delete activityData.date; // Remove temp field
+                delete activityData.date; // Date is used as key, remove from object payload
                 
                 const newItinerary = { ...tripData.itinerary };
-                
-                // Ensure target array exists and is CLONED to trigger React state update
-                if (!newItinerary[targetDate]) {
-                    newItinerary[targetDate] = [];
-                } else {
-                    newItinerary[targetDate] = [...newItinerary[targetDate]];
-                }
 
                 if (editingActivity) {
-                    // --- Update Mode ---
-                    const oldDate = editingActivity.date || selectedDate;
-                    const activityId = editingActivity.id;
-                    
+                    // Update Mode
                     if (oldDate !== targetDate) {
-                        // Date changed: Remove from old date
+                        // 1. Remove from old date
                         if (newItinerary[oldDate]) {
                             newItinerary[oldDate] = newItinerary[oldDate].filter(a => a.id !== activityId);
                         }
                     } else {
-                        // Same date: Remove old version to be replaced
-                        newItinerary[targetDate] = newItinerary[targetDate].filter(a => a.id !== activityId);
+                        // 2. Simple update on the same day (remove old, add new to ensure proper re-sort)
+                        newItinerary[targetDate] = (newItinerary[targetDate] || []).filter(a => a.id !== activityId);
                     }
-                    
-                    // Add updated version
-                    newItinerary[targetDate].push({
-                        ...activityData,
-                        id: activityId,
-                        createdBy: editingActivity.createdBy
-                    });
-                } else {
-                    // --- Create Mode ---
-                    const newId = generateId();
-                    newItinerary[targetDate].push({
-                        ...activityData,
-                        id: newId,
-                        createdBy: currentMember.name
-                    });
+                } else if (newItinerary[oldDate]) { // Non-editing, check if exists on selected date
+                     // If adding a new activity, simply push to the targetDate. The filtering in the else block above is not strictly necessary for CREATE, but we keep the targetDate handling logic here.
                 }
+
+                // 3. Add or update on the target date
+                if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
+                // Re-filter before push in case of non-editing mode to ensure uniqueness for current operation
+                if (!editingActivity) {
+                    newItinerary[targetDate] = newItinerary[targetDate].filter(a => a.id !== activityId);
+                }
+                newItinerary[targetDate].push({
+                    id: activityId,
+                    ...activityData,
+                    createdBy: activityCreator
+                });
                 
-                // If date changed, switch view to that date
+                // If the selectedDate remains valid after saving, set it to target date if it changed
                 if (selectedDate !== targetDate) {
                    setSelectedDate(targetDate);
                 }
