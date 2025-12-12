@@ -1434,8 +1434,9 @@
                     if (fbUser && localOfflineId && fbUser.uid !== localOfflineId) {
                         console.log(`[Identity Migration] Migrating from ${localOfflineId} to ${fbUser.uid}`);
                         
-                        // 遍歷所有本地旅程資料
-                        Object.keys(localStorage).forEach(key => {
+                        // FIX: Use for...of to allow await inside loop
+                        const keys = Object.keys(localStorage);
+                        for (const key of keys) {
                             if (key.startsWith('gtp_trip_')) {
                                 try {
                                     const rawData = localStorage.getItem(key);
@@ -1458,6 +1459,14 @@
                                             // 寫回 localStorage
                                             localStorage.setItem(key, JSON.stringify(tripObj));
                                             
+                                            // FIX: Upload migrated data IMMEDIATELY to cloud to prevent onSnapshot from overwriting it with old data
+                                            try {
+                                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripObj.id), sanitizeFirestoreData(tripObj));
+                                                console.log(`[Identity Migration] Synced ${tripObj.id} to cloud`);
+                                            } catch (uploadErr) {
+                                                console.error("Migration upload failed", uploadErr);
+                                            }
+
                                             // 如果這剛好是當前正在顯示的旅程，同步更新 React State，避免 UI 權限判斷錯誤
                                             if (tripObj.id === tripId) {
                                                 setTripData(tripObj);
@@ -1470,7 +1479,7 @@
                                     console.error("[Identity Migration] Error processing trip:", key, err);
                                 }
                             }
-                        });
+                        }
                     }
                     // --- IDENTITY MIGRATION FIX END ---
                     
@@ -1733,7 +1742,11 @@
                      if (apps.length > 0) {
                          // FIX: Define db instance before using it in updateDoc
                          const db = getFirestore(apps[0]);
-                         updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) });
+                         updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) })
+                            .catch(e => {
+                                console.error("Update trip failed:", e);
+                                alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
+                            });
                      }
                 }
             };
@@ -1747,7 +1760,11 @@
                      if (apps.length > 0) {
                          // FIX: Define db instance before using it in setDoc
                          const db = getFirestore(apps[0]);
-                         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData));
+                         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData))
+                            .catch(e => {
+                                console.error("Update full trip failed:", e);
+                                alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
+                            });
                      }
                 }
             }
