@@ -1734,37 +1734,68 @@
                 if (!tripData) return;
                 
                 if (isOffline) {
-                     const newData = { ...tripData, [field]: val };
-                     setTripData(newData);
-                     localStorage.setItem(`gtp_trip_${tripData.id}`, JSON.stringify(newData));
+                     try {
+                         const newData = { ...tripData, [field]: val };
+                         setTripData(newData);
+                         localStorage.setItem(`gtp_trip_${tripData.id}`, JSON.stringify(newData));
+                     } catch (e) {
+                         console.error("Local update failed", e);
+                         alert("儲存本機資料失敗: " + e.message);
+                     }
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
-                         // FIX: Define db instance before using it in updateDoc
-                         const db = getFirestore(apps[0]);
-                         updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) })
-                            .catch(e => {
-                                console.error("Update trip failed:", e);
-                                alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
-                            });
+                         // FIX: Wrap in try-catch to handle synchronous errors (e.g. invalid doc reference)
+                         try {
+                             if (!tripId) throw new Error("無效的 Trip ID");
+                             
+                             const db = getFirestore(apps[0]);
+                             // Validate tripId string to prevent doc() from throwing hard errors
+                             const validTripId = String(tripId).trim();
+                             if (!validTripId) throw new Error("Trip ID 為空");
+
+                             updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', validTripId), { [field]: sanitizeFirestoreData(val) })
+                                .catch(e => {
+                                    console.error("Update trip failed (async):", e);
+                                    alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
+                                });
+                         } catch (e) {
+                             console.error("Update trip failed (sync):", e);
+                             alert("系統錯誤 (同步): " + e.message);
+                         }
                      }
                 }
             };
             
             const updateTripFull = (newData) => {
                 if (isOffline) {
-                     setTripData(newData);
-                     localStorage.setItem(`gtp_trip_${newData.id}`, JSON.stringify(newData));
+                     try {
+                         setTripData(newData);
+                         localStorage.setItem(`gtp_trip_${newData.id}`, JSON.stringify(newData));
+                     } catch (e) {
+                         console.error("Local full update failed", e);
+                         alert("儲存本機資料失敗: " + e.message);
+                     }
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
-                         // FIX: Define db instance before using it in setDoc
-                         const db = getFirestore(apps[0]);
-                         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData))
-                            .catch(e => {
-                                console.error("Update full trip failed:", e);
-                                alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
-                            });
+                         // FIX: Wrap in try-catch to handle synchronous errors
+                         try {
+                             if (!tripId) throw new Error("無效的 Trip ID");
+
+                             const db = getFirestore(apps[0]);
+                             const validTripId = String(tripId).trim();
+                             if (!validTripId) throw new Error("Trip ID 為空");
+
+                             setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', validTripId), sanitizeFirestoreData(newData))
+                                .catch(e => {
+                                    console.error("Update full trip failed (async):", e);
+                                    alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
+                                });
+                         } catch (e) {
+                             console.error("Update full trip failed (sync):", e);
+                             alert("系統錯誤 (同步): " + e.message);
+                         }
                      }
                 }
             }
