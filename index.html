@@ -116,6 +116,15 @@
         const getDayOfWeek = (d) => ['週日','週一','週二','週三','週四','週五','週六'][new Date(d).getDay()];
         const getMonthDay = (d) => { const date = new Date(d); return `${date.getMonth()+1}/${date.getDate()}`; };
         
+        // FIX: Add robust date formatter to ensure YYYY-MM-DD format regardless of locale
+        const toLocalISOString = (date) => {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         const openGoogleMaps = (query) => {
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
         };
@@ -959,12 +968,12 @@
         };
 
         const FlightCard = ({ label, icon: Icon, data, onUpdate, isOwner }) => (
-            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-3 mb-4 relative border border-[#eeeeee]">
+            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-2 mb-2 relative border border-[#eeeeee]">
                 <div className="absolute top-0 right-0 bg-[#3B82F6] text-white text-[10px] px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold">{label}</div>
-                <div className="flex items-center justify-between mt-2">
-                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-1 placeholder-gray-300" /></div>
-                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-1 transform rotate-45"><Icon size={24} /></div><div className="w-full flex items-center justify-center relative mb-1"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-sm font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
-                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-1 text-right placeholder-gray-300" /></div>
+                <div className="flex items-center justify-between mt-3">
+                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 placeholder-gray-300" /></div>
+                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-0.5 transform rotate-45"><Icon size={20} /></div><div className="w-full flex items-center justify-center relative mb-0.5"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-xs font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
+                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 text-right placeholder-gray-300" /></div>
                 </div>
             </div>
         );
@@ -1176,7 +1185,12 @@
                                             <div className="flex justify-between items-center mb-1 h-[16px]">
                                                 <label className="text-[10px] text-gray-400 font-bold block">付款人</label>
                                             </div>
-                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">{tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}</select>
+                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
+                                                {tripData.members.map(m => (
+                                                    // FIX: Guard clause to prevent crash if member is null
+                                                    m ? <option key={m.name} value={m.name}>{m.name}</option> : null
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -1265,7 +1279,14 @@
                             <div className="flex items-end gap-2">
                                 <div className="w-[50%]"><label className="text-xs text-gray-400 font-bold block">金額</label><div className="relative"><DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl pl-7 p-2 text-xl font-bold text-gray-800 border border-[#eeeeee]" autoFocus /></div></div>
                                 <div className="w-[20%]"><label className="text-xs text-gray-400 font-bold block">幣別</label><select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select></div>
-                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label><select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}</select></div>
+                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label>
+                                    <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">
+                                        {tripData.members.map(m => (
+                                            // FIX: Guard clause to prevent crash if member is null
+                                            m ? <option key={m.name} value={m.name}>{m.name}</option> : null
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-center mb-2"><label className="text-xs text-gray-400 font-bold">分類</label><button onClick={()=>setIsManage(!isManage)} className="text-xs text-[#D68C68] flex items-center gap-1 font-bold"><Settings size={12}/>管理</button></div>
@@ -1399,9 +1420,9 @@
             const [setupForm, setSetupForm] = useState(
                 restored?.setupForm || { 
                     destination: '', 
-                    // Fix: Use local time (en-CA gives YYYY-MM-DD) instead of ISO string (UTC) to avoid incorrect date in early morning
-                    startDate: new Date().toLocaleDateString('en-CA'), 
-                    endDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'), 
+                    // FIX: Use robust formatter instead of locale-dependent string (en-CA)
+                    startDate: toLocalISOString(new Date()), 
+                    endDate: toLocalISOString(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)), 
                     currency: 'JPY', 
                     nickname: '', 
                     pin: '' 
@@ -2217,9 +2238,13 @@
                         if (!newAccommodations[dateStr]) return;
                         
                         // Check if this item should exist on this day based on the new date range
-                        const shouldExist = updatedItem.checkInDate && updatedItem.checkOutDate 
+                        // FIX: Prevent card from vanishing if user sets Invalid Range (Start > End) temporarily while editing
+                        const hasDates = updatedItem.checkInDate && updatedItem.checkOutDate;
+                        const validDates = hasDates && updatedItem.checkInDate < updatedItem.checkOutDate;
+                        
+                        const shouldExist = validDates
                             ? isInRange(dateStr, updatedItem.checkInDate, updatedItem.checkOutDate)
-                            : dateStr === selectedDate; // Fallback: only exists on its creation day if dates aren't set
+                            : dateStr === selectedDate; // Fallback: Keep on current screen if dates are invalid or missing
 
                         let dayList = [...newAccommodations[dateStr]];
                         const existingIdx = dayList.findIndex(i => i.id === id);
@@ -2427,12 +2452,26 @@
             const expenseStatsByCurrency = useMemo(() => {
                 if (!tripData) return [];
                 
-                // Determine which currencies to calculate (Selected one or All available in constants)
+                // Determine which currencies to calculate (Selected one or All available in constants + Data)
                 let targetCurrencies = [];
                 if (expenseFilterCurrency !== 'all') {
                     targetCurrencies = [expenseFilterCurrency];
                 } else {
-                    targetCurrencies = currencies.map(c => c.value);
+                    // FIX: Dynamically collect ALL currencies used in the trip data, not just the default ones
+                    const usedCurrencies = new Set(currencies.map(c => c.value)); // Start with defaults
+                    
+                    if (tripData.itinerary) {
+                        Object.values(tripData.itinerary).forEach(dayActs => {
+                            if (Array.isArray(dayActs)) {
+                                dayActs.forEach(act => {
+                                    if (act && (act.transport === 'expense' || (act.cost && parseFloat(act.cost) > 0))) {
+                                        if (act.currency) usedCurrencies.add(act.currency);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    targetCurrencies = Array.from(usedCurrencies);
                 }
 
                 const datesToShow = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
@@ -2623,12 +2662,24 @@
                                                 <Plus size={18} /> 建立新旅程
                                             </button>
                                             {view !== 'setup' && (
-                                                <button 
-                                                    onClick={() => { setModals({ ...modals, members: true }); setIsMenuOpen(false); }} 
-                                                    className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
-                                                >
-                                                    <Users size={18} /> 旅伴管理
-                                                </button>
+                                                <>
+                                                    <button 
+                                                        onClick={() => { setModals({ ...modals, members: true }); setIsMenuOpen(false); }} 
+                                                        className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
+                                                    >
+                                                        <Users size={18} /> 旅伴管理
+                                                    </button>
+                                                    
+                                                    {/* FIX: Added Edit Trip Settings button for Owner */}
+                                                    {isOwner && (
+                                                        <button 
+                                                            onClick={() => { setModals({ ...modals, editTrip: true }); setIsMenuOpen(false); }} 
+                                                            className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
+                                                        >
+                                                            <Edit3 size={18} /> 旅程設定
+                                                        </button>
+                                                    )}
+                                                </>
                                             )}
                                             
                                             {/* Button to go back to Landing Page (Firebase Setup) */}
@@ -2878,7 +2929,7 @@
                                                                     </div>
                                                                     
                                                                     <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart size={16} /> 每日趨勢</h3>
                                                                         <SimpleBarChart data={stat.barData} />
                                                                     </div>
 
