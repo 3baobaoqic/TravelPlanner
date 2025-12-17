@@ -1504,7 +1504,13 @@
             useEffect(() => {
                 const storedRecents = localStorage.getItem('gtp_recent_trips');
                 if (storedRecents) {
-                    setRecentTrips(JSON.parse(storedRecents));
+                    try {
+                        const parsed = JSON.parse(storedRecents);
+                        // FIX: Ensure it is an array
+                        if (Array.isArray(parsed)) {
+                            setRecentTrips(parsed);
+                        }
+                    } catch(e) {}
                 }
                 
                 // Clear restore data AFTER it's been used for initialization
@@ -1727,7 +1733,12 @@
 
                             // 新增：讀取成功後，更新近期紀錄 (Fix: Update recent trips in offline mode)
                             setRecentTrips(p => { 
-                                const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
+                                // FIX: Robust date handling to prevent crash on missing dates
+                                const sDate = d.startDate || '';
+                                const eDate = d.endDate || '';
+                                const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
+                                
+                                const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...(Array.isArray(p) ? p : []).filter(t=>t.id!==d.id)].slice(0,5); 
                                 localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                 return newRecents; 
                             });
@@ -1773,7 +1784,12 @@
                                     }
                                 }
                                 setRecentTrips(p => { 
-                                    const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
+                                    // FIX: Robust date handling to prevent crash on missing dates
+                                    const sDate = d.startDate || '';
+                                    const eDate = d.endDate || '';
+                                    const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
+                                    
+                                    const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...(Array.isArray(p) ? p : []).filter(t=>t.id!==d.id)].slice(0,5); 
                                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                     return newRecents; 
                                 });
@@ -1834,7 +1850,12 @@
                 
                 if (isOffline) {
                     localStorage.setItem(`gtp_trip_${id}`, JSON.stringify(newData));
-                    const newRecent = [{id: newData.id, destination: newData.destination, dateRange: `${newData.startDate.slice(5)} - ${newData.endDate.slice(5)}`}, ...recentTrips].slice(0, 5);
+                    // FIX: Robust date handling in handleStart
+                    const sDate = newData.startDate || '';
+                    const eDate = newData.endDate || '';
+                    const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
+
+                    const newRecent = [{id: newData.id, destination: newData.destination || '未命名', dateRange: range}, ...recentTrips].slice(0, 5);
                     setRecentTrips(newRecent);
                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecent));
                     setTripData(newData);
