@@ -1213,7 +1213,8 @@
             };
 
             const deleteTransaction = (id, date, item) => {
-                if (!isOwner && item.createdBy !== currentMember.name) { alert("只能刪除自己建立的記帳"); return; }
+                // FIX: Use optional chaining for currentMember to prevent crash in guest mode
+                if (!isOwner && item.createdBy !== currentMember?.name) { alert("只能刪除自己建立的記帳"); return; }
                 setConfirm({ open: true, msg: '確定刪除此交易？', action: () => {
                     const newActs = tripData.itinerary[date].filter(a=>a.id!==id);
                     updateTrip('itinerary', {...tripData.itinerary, [date]: newActs});
@@ -1968,14 +1969,16 @@
                                                                                     <div className="flex gap-2">
                                                                                         {act.transport!=='expense' && isOwner && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
                                                                                         {act.transport==='expense' && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingExpense({...act, originalDate: selectedDate}); setModals({ ...modals, expense: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
-                                                                                        {(isOwner || (act.transport === 'expense' && act.createdBy === currentMember.name)) && <button onClick={() => act.transport==='expense' ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>}
+                                                                                        {/* FIX: Use optional chaining for currentMember to prevent crash if user is not yet a member (guest mode) */}
+                                                                                        {(isOwner || (act.transport === 'expense' && act.createdBy === currentMember?.name)) && <button onClick={() => act.transport==='expense' ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>}
                                                                                     </div>
                                                                                 </div>
                                                                                 <div className="flex gap-2 overflow-x-auto">{act.photoUrls?.map((p,i) => { 
                                                                                     // FIX: Guard clause for dirty data (null photos)
                                                                                     if (!p) return null;
                                                                                     const url = typeof p === 'string' ? p : p.url; 
-                                                                                    return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}<button onClick={()=>{setUploadTarget({type:'activity', id:act.id}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={16}/></button></div>
+                                                                                    // FIX: Use optional chaining for currentMember in photo delete check
+                                                                                    return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember?.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}<button onClick={()=>{setUploadTarget({type:'activity', id:act.id}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={16}/></button></div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
