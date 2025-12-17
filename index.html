@@ -199,7 +199,7 @@
             return b64;
         };
 
-        // FIX: Moved ConfirmModal BEFORE LandingView to avoid hoisting issues (ReferenceError in some envs)
+        // FIX: Moved ConfirmModal BEFORE LandingView to avoid hoisting issues
         const ConfirmModal = ({ isOpen, message, onConfirm, onCancel }) => {
             if (!isOpen) return null;
 
@@ -540,7 +540,6 @@
 
             if (!isOpen || !tripData) return null;
 
-            // FIX: Use optional chaining for currentMember to prevent crash in guest mode
             const isOwner = currentMember?.role === 'owner';
 
             const handleEditClick = (member, index) => {
@@ -598,7 +597,7 @@
                                 if (!member) return null;
 
                                 const isEditing = editingIndex === index;
-                                // FIX: Use optional chaining for currentMember to prevent crash in guest mode
+                                // FIX: Use optional chaining to prevent crash if currentMember is null (guest mode)
                                 const isSelf = member.name === currentMember?.name; 
                                 const isMemberOwner = member.role === 'owner';
                                 const canEdit = isOwner; 
@@ -787,7 +786,6 @@
             const authUnsubscribeRef = useRef(null);
             
             // Derived state placed early to ensure scope availability
-            // FIX: Use optional chaining for currentMember to prevent crash in guest mode
             const isOwner = currentMember?.role === 'owner';
             
             // Load recent trips and cleanup restore state on mount
@@ -1307,19 +1305,15 @@
             };
 
             // FIX: Modified to support cross-date activity saving
-            // FIX: Add check for currentMember
             const handleSaveActivity = (data) => {
-                if (!currentMember) {
-                    alert("請先加入旅程才能新增資料");
-                    return;
-                }
                 if (!isOwner) return; 
                 
                 const targetDate = data.date;
                 // For editing, if defaultValues exists, use the original date and ID
                 const oldDate = editingActivity?.date || selectedDate;
                 const activityId = editingActivity?.id || generateId();
-                const activityCreator = editingActivity?.createdBy || currentMember.name;
+                // FIX: Use optional chaining for currentMember to prevent crash
+                const activityCreator = editingActivity?.createdBy || currentMember?.name || 'Guest';
 
                 const activityData = { ...data };
                 delete activityData.date; // Date is used as key, remove from object payload
@@ -1363,13 +1357,7 @@
             };
 
             // New: Handle saving expenses (create and update with date change support)
-            // FIX: Add check for currentMember
             const handleSaveExpense = (data) => {
-                if (!currentMember) {
-                    alert("請先加入旅程才能新增記帳");
-                    return;
-                }
-
                 const targetDate = data.date;
                 const cost = parseFloat(data.cost);
                 
@@ -1401,7 +1389,8 @@
                     newItinerary[targetDate].push({
                         id: generateId(),
                         ...expenseData,
-                        createdBy: currentMember.name
+                        // FIX: Use optional chaining for currentMember to prevent crash
+                        createdBy: currentMember?.name || 'Guest'
                     });
                 }
 
@@ -1463,29 +1452,8 @@
                 // 1. Always check local storage first (fastest)
                 const localData = localStorage.getItem(`gtp_trip_${idToJoin}`);
                 if (localData) {
-                    try {
-                        // FIX: Now processLoadedData is accessible here
-                        const d = processLoadedData(JSON.parse(localData));
-                        setTripData(d);
-                        
-                        // Ensure a valid date is selected
-                        if (!selectedDate || (d.startDate && d.endDate && (selectedDate < d.startDate || selectedDate > d.endDate))) {
-                            setSelectedDate(d.startDate);
-                        }
-
-                        // Set Current Member for offline mode
-                        let found = d.members.find(m => m.deviceId === userId);
-                        if (!found && d.members.length > 0) {
-                                found = d.members.find(m => m.role === 'owner') || d.members[0];
-                        }
-                        if (found) setCurrentMember(found);
-
-                        setTripId(idToJoin);
-                        setView('planner');
-                    } catch (e) {
-                        console.error("Error processing local data", e);
-                        alert("讀取資料失敗，檔案可能已損毀");
-                    }
+                    setTripId(idToJoin);
+                    setView('planner');
                     return;
                 }
 
@@ -1681,20 +1649,16 @@
             const handleAddAccommodation = () => { if(!isOwner) return; let currentList = tripData.accommodations[selectedDate] || []; if (!Array.isArray(currentList)) currentList = [currentList]; const newList = [...currentList, { id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }]; updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList }); };
             const handleDeleteAccommodation = (id) => { if(!isOwner) return; setConfirm({ open: true, msg: '確定刪除?', action: () => { let currentList = tripData.accommodations[selectedDate]; if (!Array.isArray(currentList)) currentList = [currentList]; const newList = currentList.filter(item => item.id !== id); updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList }); }}); };
             
-            // FIX: Add check for currentMember
             const handlePhotoUpload = async (e) => {
-                if (!currentMember) {
-                    alert("請先加入旅程才能上傳照片");
-                    e.target.value = '';
-                    return;
-                }
                 const f = e.target.files[0];
                 if (f && uploadTarget) {
                     // Modified: Use processImageUpload for unified logic
                     const finalUrl = await processImageUpload(f);
                     
                     if (finalUrl) {
-                        const photoObj = { url: finalUrl, uploader: currentMember.name };
+                        // FIX: Use optional chaining for currentMember to prevent crash
+                        const uploaderName = currentMember?.name || 'Guest';
+                        const photoObj = { url: finalUrl, uploader: uploaderName };
                         const newPhotoUrls = [...(uploadTarget.data?.photoUrls || []), photoObj];
 
                         // Logic to sync photoUrls across multiple components/dates
@@ -2319,7 +2283,6 @@
                                                                     </div>
                                                                     
                                                                     <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                        {/* FIX: Corrected component name from BarChart to BarChart3 to match import */}
                                                                         <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
                                                                         <SimpleBarChart data={stat.barData} />
                                                                     </div>
