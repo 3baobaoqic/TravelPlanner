@@ -717,8 +717,8 @@
                 expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
                 accommodations: d.accommodations || {},
                 itinerary: d.itinerary || {},
-                // FIX: Ensure members array exists AND filter out nulls/invalids to prevent crashes
-                members: (Array.isArray(d.members) ? d.members : []).filter(m => m && typeof m === 'object')
+                // FIX: Ensure members array exists AND filter out nulls/invalids/nameless to prevent crashes
+                members: (Array.isArray(d.members) ? d.members : []).filter(m => m && typeof m === 'object' && typeof m.name === 'string')
             };
         };
 
