@@ -94,17 +94,18 @@
             return uid;
         };
 
-        const resizeImage = (file) => new Promise((resolve) => {
+        // FIX: Modified resizeImage to accept dynamic max dimensions and quality
+        const resizeImage = (file, maxDim, quality) => new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = document.createElement('img');
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height, max = 1024;
+                    let w = img.width, h = img.height, max = maxDim;
                     if (w > h) { if (w > max) { h *= max/w; w = max; } } else { if (h > max) { w *= max/h; h = max; } }
                     canvas.width = w; canvas.height = h;
                     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    resolve(canvas.toDataURL('image/jpeg', quality));
                 };
                 img.src = e.target.result;
             };
@@ -149,10 +150,17 @@
 
         // Unified Image Upload Helper
         const processImageUpload = async (file) => {
-            const b64 = await resizeImage(file);
+            const imgbbKey = localStorage.getItem('gtp_imgbb_key');
+            
+            // FIX: Smart compression logic
+            // If Imgbb: High Quality (1920px, 85%)
+            // If DB/Local: Low Quality (800px, 50%) to save space
+            const maxDim = imgbbKey ? 1920 : 800;
+            const quality = imgbbKey ? 0.85 : 0.5;
+
+            const b64 = await resizeImage(file, maxDim, quality);
             if (!b64) return null;
 
-            const imgbbKey = localStorage.getItem('gtp_imgbb_key');
             if (imgbbKey) {
                 try {
                     const formData = new FormData();
