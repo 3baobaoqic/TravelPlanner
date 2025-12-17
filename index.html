@@ -112,7 +112,6 @@
         });
         
         const sanitizeFirestoreData = (data) => JSON.parse(JSON.stringify(data, (k, v) => v === undefined ? null : v));
-        // FIX: Added validation to prevent RangeError: Invalid time value crash
         const getDatesArray = (s, e) => { 
             if (!s || !e) return [];
             const d = new Date(s), ed = new Date(e); 
@@ -786,6 +785,7 @@
             const authUnsubscribeRef = useRef(null);
             
             // Derived state placed early to ensure scope availability
+            // FIX: Use optional chaining to prevent crash if currentMember is null (guest mode)
             const isOwner = currentMember?.role === 'owner';
             
             // Load recent trips and cleanup restore state on mount
@@ -984,12 +984,27 @@
             useEffect(() => {
                 if (!tripId) return;
 
+                // Helper: Ensure data structure is complete (migration for old data)
+                // 補回這個函式以避免 ReferenceError
+                const processLoadedData = (d) => ({
+                    ...d,
+                    // FIX: Ensure flights deep structure exists to prevent crash
+                    flights: {
+                        outbound: (d.flights && d.flights.outbound) || {},
+                        inbound: (d.flights && d.flights.inbound) || {}
+                    },
+                    expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
+                    accommodations: d.accommodations || {},
+                    itinerary: d.itinerary || {},
+                    // FIX: Ensure members array exists to prevent crash in onSnapshot
+                    members: d.members || []
+                });
+
                 // 1. If Offline, load from LocalStorage
                 if (isOffline) {
                     const localData = localStorage.getItem(`gtp_trip_${tripId}`);
                     if (localData) {
                         try {
-                            // FIX: Now using the global processLoadedData function
                             const d = processLoadedData(JSON.parse(localData));
                             setTripData(d);
                             
@@ -1010,14 +1025,7 @@
 
                             // 新增：讀取成功後，更新近期紀錄 (Fix: Update recent trips in offline mode)
                             setRecentTrips(p => { 
-                                // FIX: Robust date handling to prevent crash on missing dates
-                                const sDate = d.startDate || '';
-                                const eDate = d.endDate || '';
-                                const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
-                                
-                                // FIX: Filter p before spreading
-                                const cleanPrev = Array.isArray(p) ? p.filter(t => t && t.id) : [];
-                                const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...cleanPrev.filter(t=>t.id!==d.id)].slice(0,5); 
+                                const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
                                 localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                 return newRecents; 
                             });
@@ -1040,7 +1048,6 @@
                     const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), 
                         async (s) => { // Made async to handle auto-upload
                             if(s.exists()) {
-                                // FIX: Now using the global processLoadedData function
                                 const d = processLoadedData(s.data());
                                 setTripData(d);
                                 
@@ -1063,14 +1070,7 @@
                                     }
                                 }
                                 setRecentTrips(p => { 
-                                    // FIX: Robust date handling to prevent crash on missing dates
-                                    const sDate = d.startDate || '';
-                                    const eDate = d.endDate || '';
-                                    const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
-                                    
-                                    // FIX: Filter p before spreading
-                                    const cleanPrev = Array.isArray(p) ? p.filter(t => t && t.id) : [];
-                                    const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...cleanPrev.filter(t=>t.id!==d.id)].slice(0,5); 
+                                    const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
                                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                     return newRecents; 
                                 });
@@ -1131,14 +1131,7 @@
                 
                 if (isOffline) {
                     localStorage.setItem(`gtp_trip_${id}`, JSON.stringify(newData));
-                    // FIX: Robust date handling in handleStart
-                    const sDate = newData.startDate || '';
-                    const eDate = newData.endDate || '';
-                    const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
-                    
-                    // FIX: Filter recentTrips before spreading
-                    const cleanPrev = Array.isArray(recentTrips) ? recentTrips.filter(t => t && t.id) : [];
-                    const newRecent = [{id: newData.id, destination: newData.destination || '未命名', dateRange: range}, ...cleanPrev].slice(0, 5);
+                    const newRecent = [{id: newData.id, destination: newData.destination, dateRange: `${newData.startDate.slice(5)} - ${newData.endDate.slice(5)}`}, ...recentTrips].slice(0, 5);
                     setRecentTrips(newRecent);
                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecent));
                     setTripData(newData);
@@ -1448,12 +1441,35 @@
                 
                 // 【修復白屏關鍵】切換 ID 時先清空舊資料，避免渲染錯誤或殘留
                 setTripData(null); 
+                // FIX: Reset currentMember to avoid stale state from previous trip
+                setCurrentMember(null);
 
                 // 1. Always check local storage first (fastest)
                 const localData = localStorage.getItem(`gtp_trip_${idToJoin}`);
                 if (localData) {
-                    setTripId(idToJoin);
-                    setView('planner');
+                    try {
+                        // FIX: Now processLoadedData is accessible here
+                        const d = processLoadedData(JSON.parse(localData));
+                        setTripData(d);
+                        
+                        // Ensure a valid date is selected
+                        if (!selectedDate || (d.startDate && d.endDate && (selectedDate < d.startDate || selectedDate > d.endDate))) {
+                            setSelectedDate(d.startDate);
+                        }
+
+                        // Set Current Member for offline mode
+                        let found = d.members.find(m => m.deviceId === userId);
+                        if (!found && d.members.length > 0) {
+                                found = d.members.find(m => m.role === 'owner') || d.members[0];
+                        }
+                        if (found) setCurrentMember(found);
+
+                        setTripId(idToJoin);
+                        setView('planner');
+                    } catch (e) {
+                        console.error("Error processing local data", e);
+                        alert("讀取資料失敗，檔案可能已損毀");
+                    }
                     return;
                 }
 
