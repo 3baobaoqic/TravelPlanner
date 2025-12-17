@@ -113,6 +113,20 @@
         });
         
         const sanitizeFirestoreData = (data) => JSON.parse(JSON.stringify(data, (k, v) => v === undefined ? null : v));
+        
+        // FIX: Moved processLoadedData to global scope to be accessible by all functions
+        const processLoadedData = (d) => ({
+            ...d,
+            flights: {
+                outbound: (d.flights && d.flights.outbound) || {},
+                inbound: (d.flights && d.flights.inbound) || {}
+            },
+            expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
+            accommodations: d.accommodations || {},
+            itinerary: d.itinerary || {},
+            members: d.members || []
+        });
+
         const getDatesArray = (s, e) => { const a = [], d = new Date(s), ed = new Date(e); while(d<=ed) { a.push(new Date(d).toISOString().split('T')[0]); d.setDate(d.getDate()+1); } return a; };
         const getDayOfWeek = (d) => ['週日','週一','週二','週三','週四','週五','週六'][new Date(d).getDay()];
         const getMonthDay = (d) => { const date = new Date(d); return `${date.getMonth()+1}/${date.getDate()}`; };
@@ -153,8 +167,6 @@
             const imgbbKey = localStorage.getItem('gtp_imgbb_key');
             
             // FIX: Smart compression logic
-            // If Imgbb: High Quality (1920px, 85%)
-            // If DB/Local: Low Quality (800px, 50%) to save space
             const maxDim = imgbbKey ? 1920 : 800;
             const quality = imgbbKey ? 0.85 : 0.5;
 
@@ -193,7 +205,6 @@
             const [successMessage, setSuccessMessage] = useState(''); 
             const [infoType, setInfoType] = useState(null); 
             const [pendingJoinId, setPendingJoinId] = useState(null); 
-            // FIX: Add state for ConfirmModal in LandingView for consistency
             const [confirmData, setConfirmData] = useState({ open: false, message: '', onConfirm: null });
 
             useEffect(() => {
@@ -307,7 +318,6 @@
                     try {
                         const bundle = JSON.parse(cleanId);
                         if (bundle.id && bundle.firebase) {
-                            // FIX: Use custom ConfirmModal instead of window.confirm for consistency
                             setConfirmData({
                                 open: true,
                                 message: `偵測到包含 Firebase 設定的旅程代碼 (ID: ${bundle.id})。\n\n是否要自動匯入設定、建立連線並加入旅程？`,
@@ -1518,6 +1528,21 @@
                 return () => clearTimeout(timer);
             }, []);
 
+            // FIX: Moved processLoadedData OUTSIDE useEffect so it can be used by handleLocalJoin
+            const processLoadedData = (d) => ({
+                ...d,
+                // FIX: Ensure flights deep structure exists to prevent crash
+                flights: {
+                    outbound: (d.flights && d.flights.outbound) || {},
+                    inbound: (d.flights && d.flights.inbound) || {}
+                },
+                expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
+                accommodations: d.accommodations || {},
+                itinerary: d.itinerary || {},
+                // FIX: Ensure members array exists to prevent crash in onSnapshot
+                members: d.members || []
+            });
+
             const reInit = async (config) => {
                  // Cleanup existing auth listener
                  if (authUnsubscribeRef.current) {
@@ -1581,13 +1606,11 @@
                                             // 寫回 localStorage
                                             localStorage.setItem(key, JSON.stringify(tripObj));
                                             
-                                            // FIX: Upload migrated data IMMEDIATELY to cloud to prevent onSnapshot from overwriting it with old data
-                                            try {
-                                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripObj.id), sanitizeFirestoreData(tripObj));
-                                                console.log(`[Identity Migration] Synced ${tripObj.id} to cloud`);
-                                            } catch (uploadErr) {
-                                                console.error("Migration upload failed", uploadErr);
-                                            }
+                                            // FIX: Upload migrated data IMMEDIATELY to cloud
+                                            // Important: Removed inner try-catch so errors bubble up. 
+                                            // If upload fails, we MUST abort the online switch to protect data integrity.
+                                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripObj.id), sanitizeFirestoreData(tripObj));
+                                            console.log(`[Identity Migration] Synced ${tripObj.id} to cloud`);
 
                                             // 如果這剛好是當前正在顯示的旅程，同步更新 React State，避免 UI 權限判斷錯誤
                                             if (tripObj.id === tripId) {
@@ -1599,6 +1622,12 @@
                                     }
                                 } catch (err) {
                                     console.error("[Identity Migration] Error processing trip:", key, err);
+                                    // FIX: If this is a critical Firestore upload error, abort the entire connection process.
+                                    // We check for 'FirebaseError' or code starting with 'firestore/'
+                                    if (err.name === 'FirebaseError' || (err.code && String(err.code).startsWith('firestore/'))) {
+                                        throw new Error("同步資料至雲端失敗，請檢查網路連線 (身分遷移中止)。");
+                                    }
+                                    // If it's just a JSON parse error on a local file, we can ignore it and continue looping.
                                 }
                             }
                         }
@@ -1672,22 +1701,6 @@
             // --- Data Sync Logic (Hybrid with Auto-Upload) ---
             useEffect(() => {
                 if (!tripId) return;
-
-                // Helper: Ensure data structure is complete (migration for old data)
-                // 補回這個函式以避免 ReferenceError
-                const processLoadedData = (d) => ({
-                    ...d,
-                    // FIX: Ensure flights deep structure exists to prevent crash
-                    flights: {
-                        outbound: (d.flights && d.flights.outbound) || {},
-                        inbound: (d.flights && d.flights.inbound) || {}
-                    },
-                    expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
-                    accommodations: d.accommodations || {},
-                    itinerary: d.itinerary || {},
-                    // FIX: Ensure members array exists to prevent crash in onSnapshot
-                    members: d.members || []
-                });
 
                 // 1. If Offline, load from LocalStorage
                 if (isOffline) {
@@ -2131,8 +2144,29 @@
                 // 1. Always check local storage first (fastest)
                 const localData = localStorage.getItem(`gtp_trip_${idToJoin}`);
                 if (localData) {
-                    setTripId(idToJoin);
-                    setView('planner');
+                    try {
+                        // FIX: Now processLoadedData is accessible here
+                        const d = processLoadedData(JSON.parse(localData));
+                        setTripData(d);
+                        
+                        // Ensure a valid date is selected
+                        if (!selectedDate || (d.startDate && d.endDate && (selectedDate < d.startDate || selectedDate > d.endDate))) {
+                            setSelectedDate(d.startDate);
+                        }
+
+                        // Set Current Member for offline mode
+                        let found = d.members.find(m => m.deviceId === userId);
+                        if (!found && d.members.length > 0) {
+                                found = d.members.find(m => m.role === 'owner') || d.members[0];
+                        }
+                        if (found) setCurrentMember(found);
+
+                        setTripId(idToJoin);
+                        setView('planner');
+                    } catch (e) {
+                        console.error("Error processing local data", e);
+                        alert("讀取資料失敗，檔案可能已損毀");
+                    }
                     return;
                 }
 
@@ -2958,6 +2992,7 @@
                                                                     </div>
                                                                     
                                                                     <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
+                                                                        {/* FIX: Corrected component name from BarChart to BarChart3 to match import */}
                                                                         <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
                                                                         <SimpleBarChart data={stat.barData} />
                                                                     </div>
