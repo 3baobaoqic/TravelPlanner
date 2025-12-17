@@ -94,7 +94,6 @@
             return uid;
         };
 
-        // FIX: Modified resizeImage to accept dynamic max dimensions and quality
         const resizeImage = (file, maxDim, quality) => new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -113,20 +112,6 @@
         });
         
         const sanitizeFirestoreData = (data) => JSON.parse(JSON.stringify(data, (k, v) => v === undefined ? null : v));
-        
-        // FIX: Moved processLoadedData to global scope to be accessible by all functions
-        const processLoadedData = (d) => ({
-            ...d,
-            flights: {
-                outbound: (d.flights && d.flights.outbound) || {},
-                inbound: (d.flights && d.flights.inbound) || {}
-            },
-            expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
-            accommodations: d.accommodations || {},
-            itinerary: d.itinerary || {},
-            members: d.members || []
-        });
-
         const getDatesArray = (s, e) => { const a = [], d = new Date(s), ed = new Date(e); while(d<=ed) { a.push(new Date(d).toISOString().split('T')[0]); d.setDate(d.getDate()+1); } return a; };
         const getDayOfWeek = (d) => ['週日','週一','週二','週三','週四','週五','週六'][new Date(d).getDay()];
         const getMonthDay = (d) => { const date = new Date(d); return `${date.getMonth()+1}/${date.getDate()}`; };
@@ -164,10 +149,17 @@
 
         // Unified Image Upload Helper
         const processImageUpload = async (file) => {
-            const b64 = await resizeImage(file);
+            const imgbbKey = localStorage.getItem('gtp_imgbb_key');
+            
+            // FIX: Smart compression logic
+            // If Imgbb: High Quality (1920px, 85%)
+            // If DB/Local: Low Quality (800px, 50%) to save space
+            const maxDim = imgbbKey ? 1920 : 800;
+            const quality = imgbbKey ? 0.85 : 0.5;
+
+            const b64 = await resizeImage(file, maxDim, quality);
             if (!b64) return null;
 
-            const imgbbKey = localStorage.getItem('gtp_imgbb_key');
             if (imgbbKey) {
                 try {
                     const formData = new FormData();
@@ -470,12 +462,14 @@
                                     <h3 className="text-xs font-bold text-gray-400 mb-3 flex items-center gap-2 uppercase tracking-wider"><History size={14}/> 近期瀏覽</h3>
                                     <div className="space-y-2">
                                         {recentTrips.map(trip => (
+                                            // FIX: Add render guard to prevent crash on null trips
+                                            (!trip || !trip.id) ? null :
                                             <div key={trip.id} onClick={() => onJoin(trip.id)} className="bg-[#EDF7F6] p-3 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center cursor-pointer hover:border-[#0ABAB5] hover:shadow-md transition-all group">
                                                 <div>
                                                     <div className="font-bold text-gray-700 text-sm flex items-center gap-2">
                                                         {trip.destination || '未命名行程'}
                                                         {/* 簡單判斷是否為純本機 ID 格式 (trip_開頭) */}
-                                                        {trip.id.toString().startsWith('trip_') && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 rounded border border-gray-200">本機</span>}
+                                                        {String(trip.id).startsWith('trip_') && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 rounded border border-gray-200">本機</span>}
                                                     </div>
                                                     <div className="text-[10px] text-gray-400 mt-0.5">{trip.dateRange}</div>
                                                 </div>
@@ -684,756 +678,20 @@
             );
         };
 
-        const JoinModal = ({ isOpen, onClose, tripData, onJoin }) => {
-            const [mode, setMode] = useState('new'); 
-            const [name, setName] = useState('');
-            const [pin, setPin] = useState('');
-            const [error, setError] = useState('');
-
-            if (!isOpen || !tripData) return null;
-
-            const handleJoin = () => {
-                setError('');
-                if (!pin.trim()) { setError('請輸入 PIN 碼'); return; }
-                
-                if (mode === 'new') {
-                    if (!name.trim()) { setError('請輸入您的暱稱'); return; }
-                    if (tripData.members.some(m => m.name === name.trim())) { setError('此暱稱已被使用，請更換'); return; }
-                    onJoin({ name: name.trim(), pin: pin.trim(), role: 'collaborator', isNew: true });
-                } else {
-                    if (!name) { setError('請選擇您的身分'); return; }
-                    const member = tripData.members.find(m => m.name === name);
-                    if (!member) { setError('找不到成員資料'); return; }
-                    if (member.pin !== pin.trim()) { setError('PIN 碼錯誤'); return; }
-                    onJoin({ name: member.name, pin: member.pin, role: member.role, isNew: false });
-                }
-            };
-
-            return (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
-                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-                    <div className="bg-[#F5FDFC] w-full max-w-sm rounded-2xl p-6 border border-[#eeeeee] shadow-2xl relative z-10 flex flex-col">
-                        <h3 className="text-xl font-bold text-[#0ABAB5] mb-4 text-center">加入旅程</h3>
-                        <div className="flex bg-gray-200 p-1 rounded-xl mb-4">
-                            <button onClick={() => setMode('new')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'new' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>我是新協作者</button>
-                            <button onClick={() => setMode('old')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'old' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>我是舊成員</button>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            {mode === 'new' ? (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 block mb-1">您的暱稱</label>
-                                    <input value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]" placeholder="例如：小明" />
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 block mb-1">選擇您的身分</label>
-                                    <select value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]">
-                                        <option value="">-- 請選擇 --</option>
-                                        {tripData.members.map(m => {
-                                            // FIX: Guard clause
-                                            if (!m) return null;
-                                            return <option key={m.name} value={m.name}>{m.name}</option>;
-                                        })}
-                                    </select>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 block mb-1">{mode === 'new' ? '設定您的 PIN 碼' : '輸入 PIN 碼驗證'}</label>
-                                <input type="password" value={pin} onChange={e => setPin(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]" placeholder="****" />
-                            </div>
-                        </div>
-
-                        {error && <p className="text-red-500 text-xs font-bold mt-3 text-center">{error}</p>}
-
-                        <button onClick={handleJoin} className="w-full py-3 bg-[#0ABAB5] text-white rounded-xl font-bold border border-[#0ABAB5] hover:bg-[#008985] transition-all mt-6">
-                            {mode === 'new' ? '加入並開始' : '驗證並登入'}
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
-        const AutoSaveInput = ({ value, onSave, readOnly, ...props }) => {
-            const [v, setV] = useState(value ?? '');
-            useEffect(() => setV(value ?? ''), [value]);
-            
-            // FIX: Ensure comparison handles null/undefined correctly to avoid unnecessary saves when data is dirty
-            const handleBlur = () => {
-                const normalizedV = v === null || v === undefined ? '' : String(v);
-                const normalizedValue = value === null || value === undefined ? '' : String(value);
-
-                if (normalizedV !== normalizedValue) {
-                    onSave(v);
-                }
-            };
-            
-            const propsFinal = { ...props, value: v, onChange: e => setV(e.target.value), onBlur: handleBlur, onKeyDown: e => e.key === 'Enter' && e.target.blur(), readOnly };
-            return props.type === 'textarea' ? <textarea {...propsFinal} /> : <input {...propsFinal} />;
-        };
-
-        const ImageModal = ({ src, onClose }) => !src ? null : <div className="fixed inset-0 z-[70] bg-black/20 flex items-center justify-center p-4" onClick={onClose}><img src={src} className="max-w-full max-h-full object-contain rounded-lg" /></div>;
-
-        const SimplePieChart = ({ data }) => {
-            const total = data.reduce((sum, item) => sum + item.value, 0);
-            if (total === 0) return <div className="h-40 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-full w-40 mx-auto">尚無消費數據</div>;
-            let currentAngle = 0;
-            return (
-                <div className="relative h-48 w-48 mx-auto">
-                <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                    {data.map((item, i) => {
-                    const angle = (item.value / total) * 360;
-                    const x1 = 50 + 50 * Math.cos(Math.PI * currentAngle / 180);
-                    const y1 = 50 + 50 * Math.sin(Math.PI * currentAngle / 180);
-                    const x2 = 50 + 50 * Math.cos(Math.PI * (currentAngle + angle) / 180);
-                    const y2 = 50 + 50 * Math.sin(Math.PI * (currentAngle + angle) / 180);
-                    const largeArc = angle > 180 ? 1 : 0;
-                    const pathData = total === item.value ? `M 50 50 m -50, 0 a 50,50 0 1,0 100,0 a 50,50 0 1,0 -100,0` : `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArc} 1 ${x2} ${y2} Z`;
-                    const slice = <path key={i} d={pathData} fill={item.color} stroke="white" strokeWidth="1" />;
-                    currentAngle += angle;
-                    return slice;
-                    })}
-                    <circle cx="50" cy="50" r="30" fill="#F5FDFC" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col"><span className="text-xs text-gray-400">總支出</span><span className="text-lg font-bold text-gray-700">${total.toLocaleString()}</span></div>
-                </div>
-            );
-        };
-
-        const SimpleBarChart = ({ data }) => {
-            const maxVal = Math.max(...data.map(d => d.total), 1); 
-            if (data.length === 0 || maxVal === 0) return <div className="text-xs text-center text-gray-400 py-4">尚無資料</div>;
-            return (
-                <div className="w-full overflow-x-auto no-scrollbar">
-                <div className="flex items-end gap-3 h-40 pt-6 px-2 min-w-max">
-                    {data.map((item, i) => {
-                    const heightPercent = maxVal > 0 ? (item.total / maxVal) * 100 : 0;
-                    const displayHeight = Math.max(heightPercent, 2); 
-                    return (
-                        <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
-                        <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-[#C8D9D9] border border-[#B0C4C4]" style={{ height: `${displayHeight}%` }}>
-                            {item.breakdown.map((seg, idx) => {
-                                const segHeight = item.total > 0 ? (seg.cost / item.total) * 100 : 0;
-                                if(segHeight <= 0) return null;
-                                return <div key={idx} style={{ height: `${segHeight}%`, backgroundColor: seg.color }} className="w-full transition-all duration-300" />;
-                            })}
-                            {item.total > 0 && <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 shadow-lg pointer-events-none">${item.total}</div>}
-                        </div>
-                        <div className="text-[10px] text-gray-500 font-medium">{item.date.slice(5).replace('-','/')}</div>
-                        </div>
-                    );
-                    })}
-                </div>
-                <div className="flex flex-wrap gap-3 mt-4 justify-center px-4">
-                    {Object.keys(CATEGORY_COLORS).map(cat => (
-                        <div key={cat} className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] }}></div><span className="text-[10px] text-gray-500">{cat}</span></div>
-                    ))}
-                </div>
-                </div>
-            );
-        };
-
-        const TransactionDetailModal = ({ transaction, onClose, onViewImage }) => {
-            if (!transaction) return null;
-            const color = CATEGORY_COLORS[transaction.category] || '#ccc';
-            return (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={onClose}>
-                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
-                    <div className="bg-[#F5FDFC] w-[85%] max-w-sm rounded-2xl p-5 border border-[#eeeeee] relative z-10" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-2 mb-4"><div className="w-2 h-8 rounded-full" style={{backgroundColor:color}}></div><h3 className="text-xl font-bold text-gray-800">{transaction.title || '未命名'}</h3></div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between border-b border-[#eeeeee] pb-2"><span className="text-gray-500">金額</span><span className="text-2xl font-bold text-[#D68C68]">{transaction.cost} <small>{transaction.currency}</small></span></div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div><label className="text-xs text-gray-400 block">分類</label>{transaction.category}</div>
-                                <div><label className="text-xs text-gray-400 block">付款人</label>{transaction.payer}</div>
-                            </div>
-                            {transaction.photoUrls?.length > 0 && <div className="flex gap-2 overflow-x-auto">{transaction.photoUrls.map((p, i) => {
-                                // FIX: Guard against null/undefined photos in TransactionDetailModal
-                                if (!p) return null;
-                                const url = typeof p === 'string' ? p : p.url;
-                                return <img key={i} src={url} className="w-20 h-20 object-cover rounded-lg" onClick={() => onViewImage(url)} />;
-                            })}</div>}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const AccommodationCard = ({ date, data, onUpdate, onPhotoUpload, onPhotoDelete, onViewImage, onAdd, onDelete, isOwner, currentMember }) => {
-            const [expandedId, setExpandedId] = useState(null);
-
-            return (
-                <div className="bg-[#FFF9C4] border border-yellow-300 shadow-sm rounded-2xl p-1.5 mt-4 relative mb-2">
-                    
-                    {(!data || data.length === 0) && <div className="text-center text-yellow-600 text-xs py-1">尚未新增住宿</div>}
-
-                    {(data || []).map((item, index) => {
-                        // FIX: Guard clause for dirty data (null items)
-                        if (!item) return null;
-
-                        const isExpanded = expandedId === item.id;
-                        return (
-                            <div key={item.id || index} className={index > 0 ? "border-t border-yellow-200 pt-0.5 mt-0.5" : ""}>
-                                {/* Header - Always Visible */}
-                                <div 
-                                    className="flex items-center justify-between cursor-pointer" 
-                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                                >
-                                    <div className="flex items-center gap-1 flex-1 min-w-0 pr-8">
-                                        <BedDouble size={14} className="text-gray-600 flex-shrink-0" />
-                                        <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
-                                            <AutoSaveInput 
-                                                type="text" 
-                                                readOnly={!isOwner} 
-                                                placeholder="輸入飯店名稱..." 
-                                                value={item.name} 
-                                                onSave={(val) => onUpdate(item.id, 'name', val)} 
-                                                className="bg-transparent text-xs font-bold text-gray-800 outline-none placeholder-gray-400 w-full leading-none"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        {isOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="text-red-400 hover:text-red-600 p-0.5"><Trash2 size={12} /></button>}
-                                        <ChevronDown size={14} className={`text-yellow-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
-                                    </div>
-                                </div>
-                                
-                                {/* Details - Collapsible */}
-                                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                    <div className="pt-1 pb-0.5 space-y-1">
-                                        {/* Modified: Booking Code row with Check-in AND Check-out Boxes stacked on the right */}
-                                        <div className="flex gap-1 mb-1 items-center px-1">
-                                            {/* Booking Code Input */}
-                                            <div className="flex-1 min-w-0">
-                                                <AutoSaveInput 
-                                                    type="text" 
-                                                    readOnly={!isOwner} 
-                                                    placeholder="訂房編號" 
-                                                    value={item.bookingCode} 
-                                                    onSave={(val) => onUpdate(item.id, 'bookingCode', val)} 
-                                                    className="text-xs text-gray-500 bg-transparent outline-none w-full"
-                                                />
-                                            </div>
-
-                                            {/* Date & Time Boxes Column */}
-                                            <div className="flex flex-col gap-1 flex-shrink-0">
-                                                {/* Check-in Box */}
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
-                                                    <LogIn size={10} className="text-green-600 flex-shrink-0" />
-                                                    <input 
-                                                        type="date" 
-                                                        value={item.checkInDate || ''} 
-                                                        onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} 
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        disabled={!isOwner} 
-                                                        className="text-[10px] bg-transparent outline-none w-[80px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" 
-                                                    />
-                                                    <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
-                                                    <select 
-                                                        value={item.checkInTime || '15:00'} 
-                                                        onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} 
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        disabled={!isOwner} 
-                                                        className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10"
-                                                    >
-                                                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                                                    </select>
-                                                </div>
-
-                                                {/* Check-out Box - Added below Check-in */}
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
-                                                    <LogOutIcon size={10} className="text-red-500 flex-shrink-0" />
-                                                    <input 
-                                                        type="date" 
-                                                        value={item.checkOutDate || ''} 
-                                                        onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} 
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        disabled={!isOwner} 
-                                                        className="text-[10px] bg-transparent outline-none w-[80px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" 
-                                                    />
-                                                    <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
-                                                    <select 
-                                                        value={item.checkOutTime || '10:00'} 
-                                                        onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} 
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        disabled={!isOwner} 
-                                                        className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10"
-                                                    >
-                                                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Note Input Row */}
-                                        <div className="px-1">
-                                            <AutoSaveInput 
-                                                type="text" 
-                                                readOnly={!isOwner} 
-                                                placeholder="備註 (Wifi/密碼...)" 
-                                                value={item.note} 
-                                                onSave={(val) => onUpdate(item.id, 'note', val)} 
-                                                className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1"
-                                            />
-                                        </div>
-                                        
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex gap-2 items-stretch">
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[3] overflow-hidden">
-                                                    <Phone size={10} className="text-green-600 flex-shrink-0" />
-                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="電話" value={item.phone} onSave={(val) => onUpdate(item.id, 'phone', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
-                                                </div>
-                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[7] overflow-hidden">
-                                                    <MapPin size={10} className="text-red-500 flex-shrink-0" />
-                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="地址" value={item.address} onSave={(val) => onUpdate(item.id, 'address', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full min-w-0"/>
-                                                    <button onClick={() => item.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="text-blue-500 hover:bg-blue-50 p-1 rounded flex-shrink-0"><Navigation size={10} /></button>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-0.5">
-                                                    {item.photoUrls?.map((p, i) => {
-                                                        // FIX: Handle null photos from dirty data
-                                                        if (!p) return null;
-                                                        const url = typeof p === 'string' ? p : p.url;
-                                                        const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
-                                                        const canDelete = isOwner || (currentMember && uploader === currentMember.name);
-                                                        return ( <div key={i} className="relative flex-shrink-0"> <img src={url} className="w-10 h-10 object-cover rounded-lg border border-yellow-200 cursor-zoom-in" onClick={() => onViewImage(url)} /> {canDelete && <button onClick={() => onPhotoDelete(item.id, url, 'accom')} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"><X size={10} /></button>} </div> );
-                                                    })}
-                                                    <button onClick={() => onPhotoUpload(item.id)} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    {/* Button Moved to Bottom Right Outside - Adjusted further down */}
-                    {isOwner && <button onClick={onAdd} className="absolute -bottom-6 right-2 bg-yellow-400 text-white shadow-md rounded-full p-1.5 hover:bg-yellow-500 transition-colors z-10 border-2 border-white"><Plus size={14} /></button>}
-                </div>
-            );
-        };
-
-        const FlightCard = ({ label, icon: Icon, data, onUpdate, isOwner }) => (
-            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-2 mb-2 relative border border-[#eeeeee]">
-                <div className="absolute top-0 right-0 bg-[#3B82F6] text-white text-[10px] px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold">{label}</div>
-                <div className="flex items-center justify-between mt-3">
-                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 placeholder-gray-300" /></div>
-                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-0.5 transform rotate-45"><Icon size={20} /></div><div className="w-full flex items-center justify-center relative mb-0.5"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-xs font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
-                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 text-right placeholder-gray-300" /></div>
-                </div>
-            </div>
-        );
-
-        const EditTripModal = ({ isOpen, onClose, tripData, onSave }) => {
-            const [formData, setFormData] = useState({});
-            useEffect(() => {
-                if (isOpen && tripData) {
-                    setFormData({ destination: tripData.destination, startDate: tripData.startDate, endDate: tripData.endDate, currency: tripData.currency });
-                }
-            }, [isOpen, tripData]);
-            if (!isOpen) return null;
-            const handleSave = () => { if (!formData.destination.trim()) { alert('請輸入目的地'); return; } onSave(formData); onClose(); };
-            return (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4">
-                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-                    <div className="bg-[#F5FDFC] w-full max-w-sm rounded-2xl p-6 border border-[#eeeeee] relative z-10 flex flex-col">
-                        <div className="flex justify-between items-center mb-4 border-b border-[#eeeeee] pb-2">
-                            <h3 className="text-lg font-bold text-gray-800">編輯旅程設定</h3>
-                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-                        </div>
-                        <div className="space-y-4">
-                            <div><label className="text-xs text-gray-500 font-bold block mb-1">目的地</label><input type="text" value={formData.destination} onChange={(e) => setFormData({...formData, destination: e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 border border-[#eeeeee]" /></div>
-                            <div className="flex gap-2">
-                                <div className="flex-1"><label className="text-xs text-gray-500 font-bold block mb-1">開始日期</label><input type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} className="flex-1 p-2 bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 border border-[#eeeeee]" /></div>
-                                <div className="flex-1"><label className="text-xs text-gray-500 font-bold block mb-1">結束日期</label><input type="date" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} className="flex-1 p-2 bg-[#E2E2E2] rounded-xl text-sm outline-none text-gray-700 border border-[#eeeeee]" /></div>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500 font-bold block mb-1">主要貨幣</label>
-                                <select value={formData.currency} onChange={(e) => setFormData({...formData, currency: e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm font-bold outline-none text-gray-700 border border-[#eeeeee]">
-                                    {currencies.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
-                                </select>
-                            </div>
-                            <button onClick={handleSave} className="w-full py-3 bg-[#0ABAB5] text-white rounded-xl font-bold border border-[#0ABAB5] hover:bg-[#008985] transition-all mt-2">儲存變更</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const ActivityModal = ({ isOpen, onClose, onSave, tripData, defaultValues, currentMember, selectedDate, onUpdateCategories }) => {
-            const [formData, setFormData] = useState({ date: selectedDate, time: '09:00', title: '', note: '', transport: 'walk', duration: '60', bookingCode: '', cost: '', currency: 'JPY', payer: '我', category: '', photoUrls: [] });
-            const [confirm, setConfirm] = useState({ open: false, idx: null });
-            const fileRef = useRef(null);
-            
-            // New state for adding category
-            const [isAddingCat, setIsAddingCat] = useState(false);
-            const [newCatName, setNewCatName] = useState("");
-            
-            useEffect(() => {
-                 if (isOpen) {
-                     if (defaultValues) { 
-                         setFormData({
-                             ...defaultValues,
-                             currency: defaultValues.currency || tripData?.currency || 'JPY',
-                             payer: defaultValues.payer || currentMember?.name || tripData?.members?.[0]?.name || '我',
-                             category: defaultValues.category || '',
-                             // FIX: Ensure date is correctly initialized for editing (using 'date' property)
-                             date: defaultValues.date || selectedDate 
-                         }); 
-                     } else { 
-                         setFormData({ 
-                             time: '09:00', title: '', note: '', transport: 'walk', duration: '60', 
-                             bookingCode: '', cost: '', 
-                             currency: tripData?.currency || 'JPY', 
-                             payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
-                             category: '', // Will be auto-set by transport effect
-                             photoUrls: [],
-                             // FIX: Use selectedDate as default for new creation
-                             date: selectedDate
-                         }); 
-                     }
-                     // Reset add category state when opening modal
-                     setIsAddingCat(false);
-                     setNewCatName("");
-                 }
-            }, [isOpen, defaultValues, tripData, currentMember, selectedDate]);
-
-            // Effect: Auto-set category based on transport if category is empty
-            useEffect(() => {
-                if (!formData.category && isOpen && !defaultValues) {
-                    if (['train', 'bus', 'taxi', 'car', 'plane', 'shinkansen', 'nightbus', 'tram'].includes(formData.transport)) {
-                        setFormData(p => ({ ...p, category: '交通' }));
-                    } else {
-                        setFormData(p => ({ ...p, category: '娛樂' }));
-                    }
-                }
-            }, [formData.transport, isOpen, defaultValues]);
-
-            if (!isOpen) return null;
-            const handleSave = () => { 
-                if(!formData.title.trim()) return alert('請輸入名稱'); 
-                // Pass date in data object for cross-date saving
-                onSave({...formData, cost: parseFloat(formData.cost)||0}); 
-                onClose(); 
-            };
-            
-            // Modified: Use processImageUpload for unified logic
-            const handleFile = async (e) => { 
-                const f = e.target.files[0]; 
-                if(f) { 
-                    const url = await processImageUpload(f); 
-                    if(url) setFormData(p => ({...p, photoUrls: [...(p.photoUrls || []), url]})); 
-                } 
-                e.target.value = ''; 
-            };
-            
-            const hasCost = formData.cost && parseFloat(formData.cost) > 0;
-
-            return (
-                <>
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-                    <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
-                    <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
-                        <div className="bg-[#6A8E83] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯行程' : '新增行程'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
-                        {/* FIX: Added flex-1 to ensure correct scrolling behavior within max-h container */}
-                        <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                            {/* FIX: Changed UI structure to include date input */}
-                            <div className="flex gap-2">
-                                <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">日期</label><input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
-                                <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">時間</label><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
-                            </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
-                            
-                            <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={2} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm resize-none text-gray-700 border border-[#eeeeee]" /></div>
-                            <div className="flex gap-2">
-                                <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">交通</label><select value={formData.transport} onChange={e=>setFormData({...formData, transport:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{transportOptions.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                                <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">停留</label><select value={formData.duration} onChange={e=>setFormData({...formData, duration:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{durationOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                            </div>
-                            
-                            {/* Cost & Expense Section */}
-                            <div className="border-t border-[#eeeeee] pt-2">
-                                <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">費用與記帳</span></div>
-                                <div className="flex gap-2 mb-2 items-start">
-                                    <div className="flex-1 flex flex-col gap-2">
-                                        {/* Cost Input - Wrapped for styling match */}
-                                        <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee] h-[38px]">
-                                            <span className="text-xs text-gray-400">$</span>
-                                            <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700 placeholder-gray-400" />
-                                        </div>
-                                        
-                                        {/* Category - Fixed Display with Add Button */}
-                                        <div>
-                                            {/* Header with fixed height to match Payer header */}
-                                            <div className="flex justify-between items-center mb-1 h-[16px]">
-                                                <label className="text-[10px] text-gray-400 font-bold">分類</label>
-                                                <button onClick={() => setIsAddingCat(!isAddingCat)} className="text-[10px] text-[#6A8E83] hover:text-[#557269] flex items-center gap-1 font-bold">
-                                                    {isAddingCat ? '取消' : '+ 新增'}
-                                                </button>
-                                            </div>
-                                            {isAddingCat ? (
-                                                <div className="flex gap-1 h-[34px]">
-                                                    <input 
-                                                        value={newCatName}
-                                                        onChange={e => setNewCatName(e.target.value)}
-                                                        placeholder="新分類"
-                                                        className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee] outline-none focus:ring-1 focus:ring-[#6A8E83]"
-                                                        autoFocus
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                if (newCatName.trim()) {
-                                                                    const currentCats = tripData.expenseCategories || [];
-                                                                    if (!currentCats.includes(newCatName.trim())) {
-                                                                        onUpdateCategories([...currentCats, newCatName.trim()]);
-                                                                        setFormData({ ...formData, category: newCatName.trim() });
-                                                                    }
-                                                                    setNewCatName("");
-                                                                    setIsAddingCat(false);
-                                                                }
-                                                            }
-                                                        }}
-                                                    />
-                                                    <button 
-                                                        onClick={() => {
-                                                            if (newCatName.trim()) {
-                                                                const currentCats = tripData.expenseCategories || [];
-                                                                if (!currentCats.includes(newCatName.trim())) {
-                                                                    onUpdateCategories([...currentCats, newCatName.trim()]);
-                                                                    setFormData({ ...formData, category: newCatName.trim() });
-                                                                }
-                                                                setNewCatName("");
-                                                                setIsAddingCat(false);
-                                                            }
-                                                        }}
-                                                        className="bg-[#6A8E83] text-white px-2 rounded-lg text-xs"
-                                                    >
-                                                        <Check size={14} />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
-                                                    {/* tripData.expenseCategories已經在useEffect中處理過，這裡只需要確保map能正常執行 */}
-                                                    {(tripData.expenseCategories || []).map(c=><option key={c} value={c}>{c}</option>)}
-                                                </select>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="w-[35%] flex flex-col gap-2">
-                                        {/* Currency Select - Wrapped to match Cost Input height */}
-                                        <div className="bg-[#E2E2E2] rounded-xl px-1 border border-[#eeeeee] h-[38px] flex items-center">
-                                            <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-transparent p-1 text-sm font-bold text-gray-700 outline-none border-none">
-                                                {currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}
-                                            </select>
-                                        </div>
-                                        
-                                        {/* Payer - Fixed Display */}
-                                        <div>
-                                            <div className="flex justify-between items-center mb-1 h-[16px]">
-                                                <label className="text-[10px] text-gray-400 font-bold block">付款人</label>
-                                            </div>
-                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
-                                                {tripData.members.map(m => (
-                                                    // FIX: Guard clause to prevent crash if member is null
-                                                    m ? <option key={m.name} value={m.name}>{m.name}</option> : null
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-2">
-                                    <input value={formData.bookingCode} onChange={e=>setFormData({...formData, bookingCode:e.target.value})} placeholder="訂位/票券代碼 (選填)" className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee]" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-xs text-gray-400 font-bold block mb-2"></label>
-                                <div className="flex gap-2 overflow-x-auto">
-                                    {formData.photoUrls?.map((url, i) => (
-                                        <div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={() => setConfirm({open:true, idx:i})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>
-                                    ))}
-                                    <button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16} /></button>
-                                    <input type="file" ref={fileRef} className="hidden" onChange={handleFile} />
-                                </div>
-                            </div>
-                            <button onClick={handleSave} className="w-full py-3 bg-[#6A8E83] text-white rounded-xl font-bold shadow-md border border-[#6A8E83]">{defaultValues ? '儲存變更' : '加入行程'}</button>
-                        </div>
-                    </div>
-                    <ConfirmModal isOpen={confirm.open} message="確定刪除照片？" onConfirm={() => { const n = [...formData.photoUrls]; n.splice(confirm.idx, 1); setFormData({...formData, photoUrls: n}); setConfirm({open:false}); }} onCancel={() => setConfirm({open:false})} />
-                </div>
-                </>
-            );
-        };
-
-        const ExpenseModal = ({ isOpen, onClose, onSave, onUpdateCategories, selectedDate, currentMember, defaultValues, tripData }) => {
-            const [formData, setFormData] = useState({ date: selectedDate, time: '', cost: '', title: '', payer: '', currency: '', category: '', photoUrls: [], note: '' });
-            const [isManage, setIsManage] = useState(false);
-            const [newCat, setNewCat] = useState('');
-            const [confirm, setConfirm] = useState({ open: false, action: null, msg: '' });
-            const fileRef = useRef(null);
-            
-            useEffect(() => {
-                 if(isOpen) {
-                     if (defaultValues) {
-                         setFormData({
-                             date: defaultValues.originalDate || selectedDate,
-                             time: defaultValues.time || '',
-                             cost: defaultValues.cost || '',
-                             title: defaultValues.title || '',
-                             payer: defaultValues.payer || '',
-                             currency: defaultValues.currency || '',
-                             category: defaultValues.category || '',
-                             photoUrls: defaultValues.photoUrls || [],
-                             note: defaultValues.note || ''
-                         });
-                     } else {
-                         setFormData({ 
-                             date: selectedDate,
-                             time: new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}), 
-                             cost: '', 
-                             title: '', 
-                             payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
-                             currency: tripData?.currency || 'JPY', 
-                             category: '餐飲', 
-                             photoUrls: [],
-                             note: ''
-                         });
-                     }
-                 }
-            }, [isOpen, tripData, currentMember, defaultValues, selectedDate]);
-
-            if (!isOpen) return null;
-            
-            // Modified: Use processImageUpload for unified logic
-            const handleFile = async (e) => { 
-                const f = e.target.files[0]; 
-                if(f) { 
-                    const url = await processImageUpload(f); 
-                    if(url) setFormData(p => ({...p, photoUrls: [...(p.photoUrls || []), url]})); 
-                } 
-                e.target.value=''; 
-            };
-            
-            return (
-                <>
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-                    <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
-                    <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
-                        <div className="bg-[#D68C68] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯記帳' : '新增記帳'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
-                        {/* FIX: Added flex-1 to ensure correct scrolling behavior */}
-                        <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                            <div className="flex items-end gap-2">
-                                <div className="w-[50%]"><label className="text-xs text-gray-400 font-bold block">金額</label><div className="relative"><DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl pl-7 p-2 text-xl font-bold text-gray-800 border border-[#eeeeee]" autoFocus /></div></div>
-                                <div className="w-[20%]"><label className="text-xs text-gray-400 font-bold block">幣別</label><select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select></div>
-                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label>
-                                    <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">
-                                        {tripData.members.map(m => (
-                                            // FIX: Guard clause to prevent crash if member is null
-                                            m ? <option key={m.name} value={m.name}>{m.name}</option> : null
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-2"><label className="text-xs text-gray-400 font-bold">分類</label><button onClick={()=>setIsManage(!isManage)} className="text-xs text-[#D68C68] flex items-center gap-1 font-bold"><Settings size={12}/>管理</button></div>
-                                {isManage ? <div className="bg-[#E2E2E2] p-2 rounded-xl mb-2 border border-[#eeeeee]"><div className="flex flex-wrap gap-1 mb-2">{(tripData.expenseCategories||[]).map(c=><span key={c} className="bg-white px-2 py-1 rounded text-[10px] flex items-center gap-1 border border-[#eeeeee]">{c}<button onClick={()=>setConfirm({open:true, msg:`刪除 ${c}?`, action:()=>onUpdateCategories((tripData.expenseCategories||[]).filter(x=>x!==c))})}><X size={10}/></button></span>)}</div><div className="flex gap-1"><input value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="新分類" className="flex-1 p-1 text-xs rounded text-gray-700 border border-[#eeeeee]" /><button onClick={()=>{if(newCat){onUpdateCategories([...(tripData.expenseCategories||[]), newCat]); setNewCat('');}}} className="bg-green-500 text-white p-1 rounded border border-green-500"><Plus size={14}/></button></div></div> : <div className="flex flex-wrap gap-1.5">{(tripData.expenseCategories||[]).map(c=><button key={c} onClick={()=>setFormData({...formData, category:c})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${formData.category===c?'bg-[#D68C68] text-white border-[#D68C68]':'bg-[#E2E2E2] text-gray-600 border-[#eeeeee]'}`}>{c}</button>)}</div>}
-                            </div>
-                            <div className="flex gap-2">
-                                <input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="flex-1 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
-                                <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-1/3 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
-                            </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
-                            <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={1} placeholder="備註..." className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee] resize-none" /></div>
-                            <div><label className="text-xs text-gray-400 font-bold block">照片</label><div className="flex gap-2 overflow-x-auto">{formData.photoUrls?.map((url, i)=><div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...formData.photoUrls]; n.splice(i,1); setFormData({...formData, photoUrls:n})}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>)}<button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16}/></button><input type="file" ref={fileRef} className="hidden" onChange={handleFile} /></div></div>
-                            <button onClick={()=>{if(parseFloat(formData.cost)>0) { onSave(formData); }}} disabled={!formData.cost} className="w-full py-3 bg-[#D68C68] text-white rounded-xl font-bold shadow-md border border-[#D68C68]">{defaultValues ? '儲存變更' : '儲存'}</button>
-                        </div>
-                    </div>
-                    <ConfirmModal isOpen={confirm.open} message={confirm.msg} onConfirm={()=>{confirm.action(); setConfirm({open:false});}} onCancel={()=>setConfirm({open:false})} />
-                </div>
-                </>
-            );
-        };
-
-        const HeaderWithTabs = ({ tripData, selectedDate, setSelectedDate, handleAddDate, view, setView, setIsMenuOpen, onManageMembers, onExportExpenses, isOffline }) => {
-            const datesList = useMemo(() => tripData ? getDatesArray(tripData.startDate, tripData.endDate) : [], [tripData]);
-            
-            return (
-                <div className="bg-[#0ABAB5] z-10 relative flex flex-col">
-                    {/* Top Row */}
-                    <div className="text-white px-3 pt-3 pb-1 flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                            <button onClick={() => setIsMenuOpen(true)}><Menu size={24}/></button>
-                            <h1 className="font-bold leading-tight text-lg">{tripData.destination}</h1>
-                        </div>
-                        <div className="flex items-center gap-1">
-                             <div 
-                                className="w-8 h-8 flex items-center justify-center text-white rounded-full cursor-pointer hover:bg-white/10"
-                                onClick={() => {
-                                    if (isOffline) {
-                                        alert("目前為離線模式，無法產生分享連結。");
-                                    } else {
-                                        // 產生一鍵分享包
-                                        const fbConfigStr = localStorage.getItem('gtp_firebase_config');
-                                        const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key');
-                                        if (fbConfigStr) {
-                                            try {
-                                                const bundle = {
-                                                    id: tripData.id,
-                                                    firebase: JSON.parse(fbConfigStr),
-                                                    imgbb: imgbbKeyStr || ''
-                                                };
-                                                const textToCopy = JSON.stringify(bundle);
-                                                const textArea = document.createElement("textarea");
-                                                textArea.value = textToCopy;
-                                                document.body.appendChild(textArea);
-                                                textArea.select();
-                                                document.execCommand("Copy");
-                                                textArea.remove();
-                                                alert("已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。");
-                                            } catch (e) {
-                                                console.error("Bundle error", e);
-                                                alert("產生分享連結失敗");
-                                            }
-                                        }
-                                    }
-                                }}
-                                title={isOffline ? "目前為離線模式" : "點擊複製一鍵分享懶人包"}
-                            >
-                                {isOffline ? <WifiOff size={16} className="text-red-300"/> : <Wifi size={16} className="text-[#00FF00]"/>}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Bottom Row: Dates + Dollar Button */}
-                    <div className="flex items-center pl-2 pr-3 pb-2 gap-2">
-                        {/* Date List */}
-                        <div className="flex-1 flex overflow-x-auto space-x-2 no-scrollbar">
-                            {datesList.map((d, i) => (
-                                <button 
-                                    key={d} 
-                                    onClick={() => { setSelectedDate(d); setView('planner'); }} 
-                                    className={`flex-shrink-0 w-10 h-10 flex flex-col items-center justify-center rounded-xl transition-all duration-200 border ${d === selectedDate ? 'bg-[#F5FDFC] text-[#00695C] font-bold border-[#eeeeee]' : 'bg-[#008985] text-white opacity-90 border-transparent'}`}
-                                >
-                                    <span className="text-[8px] leading-none opacity-80">D{i+1}</span>
-                                    <span className="text-[10px] font-bold leading-tight my-0.5">{getMonthDay(d)}</span>
-                                    <span className="text-[8px] leading-none opacity-90">{getDayOfWeek(d)}</span>
-                                </button>
-                            ))}
-                            <button onClick={handleAddDate} className="flex-shrink-0 w-10 h-10 flex items-center justify-center border border-dashed border-white/50 rounded-xl text-white"><Plus size={20}/></button>
-                        </div>
-
-                        {/* Dollar Button - Centered with dates, Scaled Down 10% */}
-                        <button onClick={() => setView(view === 'planner' ? 'expense' : 'planner')} className="flex-shrink-0 w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-yellow-900 ring-2 ring-[#D68C68] transform hover:scale-105 transition-transform">
-                            <DollarSign size={20} strokeWidth={3} />
-                        </button>
-                    </div>
-                    
-                    {/* Export button removed from here */}
-
-                </div>
-            );
-        };
+        // FIX: Moved processLoadedData OUTSIDE useEffect so it can be used by handleLocalJoin
+        const processLoadedData = (d) => ({
+                ...d,
+                // FIX: Ensure flights deep structure exists to prevent crash
+                flights: {
+                    outbound: (d.flights && d.flights.outbound) || {},
+                    inbound: (d.flights && d.flights.inbound) || {}
+                },
+                expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
+                accommodations: d.accommodations || {},
+                itinerary: d.itinerary || {},
+                // FIX: Ensure members array exists to prevent crash in onSnapshot
+                members: d.members || []
+            });
 
         const App = () => {
             
@@ -1506,9 +764,9 @@
                 if (storedRecents) {
                     try {
                         const parsed = JSON.parse(storedRecents);
-                        // FIX: Ensure it is an array
+                        // FIX: Ensure it is an array and filter out nulls/invalids
                         if (Array.isArray(parsed)) {
-                            setRecentTrips(parsed);
+                            setRecentTrips(parsed.filter(t => t && t.id));
                         }
                     } catch(e) {}
                 }
@@ -1531,21 +789,6 @@
 
                 return () => clearTimeout(timer);
             }, []);
-
-            // FIX: Moved processLoadedData OUTSIDE useEffect so it can be used by handleLocalJoin
-            const processLoadedData = (d) => ({
-                ...d,
-                // FIX: Ensure flights deep structure exists to prevent crash
-                flights: {
-                    outbound: (d.flights && d.flights.outbound) || {},
-                    inbound: (d.flights && d.flights.inbound) || {}
-                },
-                expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
-                accommodations: d.accommodations || {},
-                itinerary: d.itinerary || {},
-                // FIX: Ensure members array exists to prevent crash in onSnapshot
-                members: d.members || []
-            });
 
             const reInit = async (config) => {
                  // Cleanup existing auth listener
@@ -1711,8 +954,7 @@
                     const localData = localStorage.getItem(`gtp_trip_${tripId}`);
                     if (localData) {
                         try {
-                            // FIX: Removed duplicate processLoadedData definition inside useEffect
-                            // Now using the global processLoadedData function
+                            // FIX: Now using the global processLoadedData function
                             const d = processLoadedData(JSON.parse(localData));
                             setTripData(d);
                             
@@ -1738,7 +980,9 @@
                                 const eDate = d.endDate || '';
                                 const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
                                 
-                                const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...(Array.isArray(p) ? p : []).filter(t=>t.id!==d.id)].slice(0,5); 
+                                // FIX: Filter p before spreading
+                                const cleanPrev = Array.isArray(p) ? p.filter(t => t && t.id) : [];
+                                const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...cleanPrev.filter(t=>t.id!==d.id)].slice(0,5); 
                                 localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                 return newRecents; 
                             });
@@ -1761,7 +1005,7 @@
                     const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), 
                         async (s) => { // Made async to handle auto-upload
                             if(s.exists()) {
-                                // FIX: Removed duplicate processLoadedData definition here as well
+                                // FIX: Now using the global processLoadedData function
                                 const d = processLoadedData(s.data());
                                 setTripData(d);
                                 
@@ -1789,7 +1033,9 @@
                                     const eDate = d.endDate || '';
                                     const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
                                     
-                                    const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...(Array.isArray(p) ? p : []).filter(t=>t.id!==d.id)].slice(0,5); 
+                                    // FIX: Filter p before spreading
+                                    const cleanPrev = Array.isArray(p) ? p.filter(t => t && t.id) : [];
+                                    const newRecents = [{id: d.id, destination: d.destination || '未命名', dateRange: range}, ...cleanPrev.filter(t=>t.id!==d.id)].slice(0,5); 
                                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                     return newRecents; 
                                 });
@@ -1854,8 +1100,10 @@
                     const sDate = newData.startDate || '';
                     const eDate = newData.endDate || '';
                     const range = (sDate && eDate) ? `${sDate.slice(5)} - ${eDate.slice(5)}` : '日期未定';
-
-                    const newRecent = [{id: newData.id, destination: newData.destination || '未命名', dateRange: range}, ...recentTrips].slice(0, 5);
+                    
+                    // FIX: Filter recentTrips before spreading
+                    const cleanPrev = Array.isArray(recentTrips) ? recentTrips.filter(t => t && t.id) : [];
+                    const newRecent = [{id: newData.id, destination: newData.destination || '未命名', dateRange: range}, ...cleanPrev].slice(0, 5);
                     setRecentTrips(newRecent);
                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecent));
                     setTripData(newData);
