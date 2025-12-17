@@ -185,6 +185,8 @@
             const [successMessage, setSuccessMessage] = useState(''); 
             const [infoType, setInfoType] = useState(null); 
             const [pendingJoinId, setPendingJoinId] = useState(null); 
+            // FIX: Add state for ConfirmModal in LandingView for consistency
+            const [confirmData, setConfirmData] = useState({ open: false, message: '', onConfirm: null });
 
             useEffect(() => {
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
@@ -297,21 +299,26 @@
                     try {
                         const bundle = JSON.parse(cleanId);
                         if (bundle.id && bundle.firebase) {
-                            if (confirm(`偵測到包含 Firebase 設定的旅程代碼 (ID: ${bundle.id})。\n\n是否要自動匯入設定、建立連線並加入旅程？`)) {
-                                localStorage.setItem('gtp_firebase_config', JSON.stringify(bundle.firebase));
-                                if (bundle.imgbb) localStorage.setItem('gtp_imgbb_key', bundle.imgbb);
-                                
-                                setConfigInput(JSON.stringify(bundle.firebase, null, 2).replace(/[{}]/g, '').trim());
-                                setImgbbKey(bundle.imgbb || '');
-                                
-                                setPendingJoinId(bundle.id);
-                                setJoinId(bundle.id); 
-                                
-                                onConnect(bundle.firebase);
-                                
-                                alert("設定已匯入，正在嘗試連線...\n\n連線成功後將自動進入旅程。");
-                                return;
-                            }
+                            // FIX: Use custom ConfirmModal instead of window.confirm for consistency
+                            setConfirmData({
+                                open: true,
+                                message: `偵測到包含 Firebase 設定的旅程代碼 (ID: ${bundle.id})。\n\n是否要自動匯入設定、建立連線並加入旅程？`,
+                                onConfirm: () => {
+                                    localStorage.setItem('gtp_firebase_config', JSON.stringify(bundle.firebase));
+                                    if (bundle.imgbb) localStorage.setItem('gtp_imgbb_key', bundle.imgbb);
+                                    
+                                    setConfigInput(JSON.stringify(bundle.firebase, null, 2).replace(/[{}]/g, '').trim());
+                                    setImgbbKey(bundle.imgbb || '');
+                                    
+                                    setPendingJoinId(bundle.id);
+                                    setJoinId(bundle.id); 
+                                    
+                                    onConnect(bundle.firebase);
+                                    
+                                    alert("設定已匯入，正在嘗試連線...\n\n連線成功後將自動進入旅程。");
+                                }
+                            });
+                            return;
                         }
                     } catch (e) {
                         console.error("JSON Parse Error", e);
@@ -375,7 +382,19 @@
 
                         <div className="flex gap-2 w-full mb-8">
                             <button 
-                                onClick={onCreateTrip}
+                                onClick={() => {
+                                    // FIX: Check for Imgbb Key before creating cloud trip
+                                    const hasImgbb = localStorage.getItem('gtp_imgbb_key');
+                                    if (!hasImgbb) {
+                                        setConfirmData({
+                                            open: true,
+                                            message: "⚠️ 注意：您尚未設定 Imgbb API Key\n\n如果不設定，照片將直接存入資料庫，受限於單一旅程 1MB 的容量上限，您可能只能上傳極少量的照片 (約 3-5 張)。\n\n若您有大量照片紀錄的需求，強烈建議先取得並設定 Imgbb API Key。\n\n確定要繼續建立嗎？",
+                                            onConfirm: onCreateTrip
+                                        });
+                                    } else {
+                                        onCreateTrip();
+                                    }
+                                }}
                                 disabled={testStatus !== 'success'}
                                 className={`flex-1 py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 text-sm
                                     ${testStatus === 'success' ? 'bg-[#0ABAB5] hover:bg-[#008985]' : 'bg-gray-300 cursor-not-allowed'}`}
@@ -453,6 +472,17 @@
                         title="如何取得 Imgbb API Key"
                         content={`1. 前往 api.imgbb.com\n2. 註冊或登入您的帳號\n3. 點擊 "Get API Key" 按鈕\n4. 複製產生的 Key 並貼上\n\n💡 設定此項可將圖片上傳至 Imgbb 圖床，解決 Firebase Firestore 的 1MB 儲存限制，讓您可以上傳更多、更清晰的照片。`}
                     />
+                    
+                    {/* FIX: Render ConfirmModal inside LandingView */}
+                    <ConfirmModal 
+                        isOpen={confirmData.open} 
+                        message={confirmData.message} 
+                        onConfirm={() => {
+                            if (confirmData.onConfirm) confirmData.onConfirm();
+                            setConfirmData({ ...confirmData, open: false });
+                        }} 
+                        onCancel={() => setConfirmData({ ...confirmData, open: false })} 
+                    />
                 </div>
             );
         };
@@ -466,7 +496,8 @@
                     <div className="bg-[#F5FDFC] w-full max-w-xs rounded-2xl p-6 border border-[#eeeeee] relative z-10 flex flex-col items-center text-center">
                         <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-500"><Trash2 size={24} /></div>
                         <h3 className="text-lg font-bold text-gray-800 mb-2">確認</h3>
-                        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+                        {/* FIX: Added whitespace-pre-line to support multiline warning messages */}
+                        <p className="text-gray-600 mb-6 text-sm whitespace-pre-line">{message}</p>
                         <div className="flex gap-3 w-full">
                             <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-gray-500 font-bold bg-gray-200 border border-[#eeeeee]">取消</button>
                             <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold border border-red-500">確定</button>
@@ -2750,17 +2781,7 @@
                                                             <button onClick={()=>setModals({...modals, expense:true})} className={`py-2 rounded-xl bg-[#D68C68] text-white font-bold flex justify-center items-center gap-2 border border-[#D68C68] shadow-sm active:scale-95 transition-transform ${!isOwner ? 'col-span-2' : ''}`}><DollarSign size={18}/> 記帳</button>
                                                         </div>
 
-                                                        {/* Day Total Summary */}
-                                                        {(() => {
-                                                            const dayCost = sortedActivities.reduce((sum, act) => sum + (parseFloat(act.cost) || 0), 0);
-                                                            if (dayCost > 0) return (
-                                                                <div className="flex justify-end items-center gap-2 mb-2 px-1">
-                                                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">預估支出</span>
-                                                                    <span className="text-sm font-bold text-gray-600">${dayCost.toLocaleString()}</span>
-                                                                </div>
-                                                            );
-                                                            return null;
-                                                        })()}
+                                                        {/* Day Total Summary REMOVED HERE */}
 
                                                         {/* Fix: Added unique keys to FlightCards to prevent state leakage */}
                                                         {selectedDate === tripData.startDate && <FlightCard key="outbound" label="去程" icon={Plane} data={tripData.flights.outbound} onUpdate={(f,v)=>updateTrip('flights', {...tripData.flights, outbound: {...tripData.flights.outbound, [f]:v}})} isOwner={isOwner} />}
@@ -2929,7 +2950,7 @@
                                                                     </div>
                                                                     
                                                                     <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart size={16} /> 每日趨勢</h3>
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><BarChart3 size={16} /> 每日趨勢</h3>
                                                                         <SimpleBarChart data={stat.barData} />
                                                                     </div>
 
