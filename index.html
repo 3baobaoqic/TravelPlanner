@@ -94,7 +94,7 @@
             return uid;
         };
 
-        const resizeImage = (file) => new Promise((resolve) => {
+const resizeImage = (file) => new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = document.createElement('img');
@@ -104,7 +104,8 @@
                     if (w > h) { if (w > max) { h *= max/w; w = max; } } else { if (h > max) { w *= max/h; h = max; } }
                     canvas.width = w; canvas.height = h;
                     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    // 設定壓縮比例為 0.8 (80%)
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
                 };
                 img.src = e.target.result;
             };
