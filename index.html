@@ -586,7 +586,8 @@
                                 // CRITICAL FIX: Add safe check for currentMember
                                 const isSelf = member.name === currentMember?.name; 
                                 const isMemberOwner = member.role === 'owner';
-                                const canEdit = isOwner; 
+                                // [MODIFIED] Allow owner to edit everyone, and anyone to edit themselves
+                                const canEdit = isOwner || isSelf; 
                                 const canRemove = isOwner && !isMemberOwner; 
 
                                 return (
@@ -1593,6 +1594,9 @@
                     await signInAnonymously(auth);
 
                     // --- IDENTITY MIGRATION FIX START ---
+                    // 修正：離線轉線上時的身分識別衝突
+                    // 當 Firebase 連線成功後，檢查本地資料。若發現舊的「離線隨機 ID」，
+                    // 自動將其遷移為新的「Firebase UID」，確保使用者不失去 Owner 權限。
                     const fbUser = auth.currentUser;
                     const localOfflineId = localStorage.getItem('gtp_local_uid');
 
