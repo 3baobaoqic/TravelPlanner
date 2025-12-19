@@ -136,6 +136,25 @@
             return b64;
         };
 
+        const parseConfig = (str) => {
+            try {
+                return JSON.parse(str);
+            } catch (e) {
+                const obj = {};
+                const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+                let found = false;
+                keys.forEach(key => {
+                    const regex = new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']+)["']`, 'i');
+                    const match = str.match(regex);
+                    if (match && match[1]) {
+                        obj[key] = match[1];
+                        found = true;
+                    }
+                });
+                return found ? obj : null;
+            }
+        };
+
         // --- 子組件 ---
 
         const InfoPopup = ({ isOpen, onClose, title, content }) => !isOpen ? null : (
@@ -157,6 +176,7 @@
             const [configInput, setConfigInput] = useState('');
             const [imgbbKey, setImgbbKey] = useState(''); 
             const [testStatus, setTestStatus] = useState('idle');
+            const [errorMessage, setErrorMessage] = useState('');
             const [infoType, setInfoType] = useState(null);
 
             useEffect(() => {
@@ -171,6 +191,23 @@
                 if (storedImgbb) setImgbbKey(storedImgbb);
                 if (!isOffline) setTestStatus('success');
             }, [isOffline]);
+
+            const handleTestConnection = async () => {
+                setTestStatus('testing');
+                const config = parseConfig(configInput);
+                if (!config || !config.apiKey || !config.projectId) {
+                    setTestStatus('error');
+                    setErrorMessage('無法辨識 Firebase 設定檔格式');
+                    return;
+                }
+                onConnect(config);
+            };
+
+            const handleJoinClick = () => {
+                const cleanId = (joinId || '').trim();
+                if (!cleanId) return alert("請輸入旅程 ID");
+                onJoin(cleanId);
+            };
 
             return (
                 <div className="flex flex-col h-full bg-[#F5FDFC] overflow-y-auto no-scrollbar">
@@ -190,16 +227,16 @@
                                 <button onClick={() => setInfoType('imgbb')} className="text-gray-400 hover:text-[#0ABAB5] transition-colors"><Info size={16} /></button>
                             </div>
                             <input value={imgbbKey} onChange={(e) => { setImgbbKey(e.target.value); setTestStatus('idle'); }} className="w-full p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none mb-4" placeholder="例如: 358e4c7980312..." />
-                            <button onClick={() => onConnect(configInput)} className="w-full py-2 rounded-lg font-bold text-xs bg-[#0ABAB5] text-white">測試連線</button>
+                            <button onClick={handleTestConnection} className="w-full py-2 rounded-lg font-bold text-xs bg-[#0ABAB5] text-white">測試連線</button>
                         </div>
                         <div className="flex gap-2 w-full mb-8">
                             <button onClick={onCreateTrip} className="flex-1 py-3 rounded-xl font-bold text-white shadow-lg bg-[#0ABAB5] flex items-center justify-center gap-2"><Plus size={18} /> 建立雲端新旅程</button>
-                            <button onClick={onOffline} className="w-[35%] py-3 rounded-xl font-bold text-white bg-red-400 flex items-center justify-center gap-2 shadow-lg"><WifiOff size={18} /> 單機版</button>
+                            <button onClick={() => onOffline()} className="w-[35%] py-3 rounded-xl font-bold text-white bg-red-400 flex items-center justify-center gap-2 shadow-lg"><WifiOff size={18} /> 單機版</button>
                         </div>
                         <div className="border-t border-gray-200 pt-6">
                             <div className="bg-gray-100 border border-gray-100 rounded-xl p-3 mb-4 shadow-sm flex gap-2">
                                 <input placeholder="輸入旅程 ID 例如：x9z8y7" value={joinId} onChange={e => setJoinId(e.target.value)} className="flex-1 p-2 bg-[#E2E2E2] border border-gray-200 rounded-lg text-gray-700 font-bold outline-none text-sm" />
-                                <button onClick={() => onJoin(joinId)} className="bg-[#0ABAB5] text-white p-2 rounded-lg"><ArrowRight size={20} /></button>
+                                <button onClick={handleJoinClick} className="bg-[#0ABAB5] text-white p-2 rounded-lg"><ArrowRight size={20} /></button>
                             </div>
                             {recentTrips.length > 0 && (
                                 <div className="mt-8">
@@ -216,7 +253,7 @@
                             )}
                         </div>
                     </div>
-                    <InfoPopup isOpen={infoType !== null} onClose={() => setInfoType(null)} title={infoType === 'firebase' ? '如何取得 Firebase 設定' : '如何取得 Imgbb API Key'} content={infoType === 'firebase' ? '請前往 Firebase Console -> 專案設定 -> 一般 -> 您的應用程式 -> Config 中複製。' : '請前往 api.imgbb.com 註冊後取得 API Key。'} />
+                    <InfoPopup isOpen={infoType !== null} onClose={() => setInfoType(null)} title={infoType === 'firebase' ? '如何取得 Firebase 設定' : '如何取得 Imgbb API Key'} content={infoType === 'firebase' ? 'Firebase Console -> 專案設定 -> 一般 -> 您的應用程式 -> Config' : '前往 api.imgbb.com 註冊後取得 API Key。'} />
                 </div>
             );
         };
@@ -615,17 +652,6 @@
                  await reInit(config);
             };
 
-            const updateTrip = (field, val) => {
-                if (!tripData) return;
-                if (isOffline) { const newData = { ...tripData, [field]: val }; setTripData(newData); localStorage.setItem(`gtp_trip_${tripData.id}`, JSON.stringify(newData)); }
-                else { const db = getFirestore(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) }); }
-            };
-
-            const updateTripFull = (newData) => {
-                if (isOffline) { setTripData(newData); localStorage.setItem(`gtp_trip_${newData.id}`, JSON.stringify(newData)); }
-                else { const db = getFirestore(); setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData)); }
-            }
-
             const handleDeleteTripFromRecent = (id, e) => {
                 if (e) e.stopPropagation();
                 setConfirm({
@@ -668,6 +694,17 @@
                 }
             }, [user, tripId, isOffline]); 
 
+            const updateTrip = (field, val) => {
+                if (!tripData) return;
+                if (isOffline) { const newData = { ...tripData, [field]: val }; setTripData(newData); localStorage.setItem(`gtp_trip_${tripData.id}`, JSON.stringify(newData)); }
+                else { const db = getFirestore(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) }); }
+            };
+
+            const updateTripFull = (newData) => {
+                if (isOffline) { setTripData(newData); localStorage.setItem(`gtp_trip_${newData.id}`, JSON.stringify(newData)); }
+                else { const db = getFirestore(); setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData)); }
+            }
+
             const handleUpdateAccommodation = (id, field, val) => { 
                 if(!isOwner) return; 
                 const newAccoms = { ...tripData.accommodations };
@@ -686,7 +723,7 @@
 
                 allDates.forEach(dStr => {
                     let dayList = Array.isArray(newAccoms[dStr]) ? [...newAccoms[dStr]] : [];
-                    const existsIdx = dayList.findIndex(i => i.id === id);
+                    const existingIdx = dayList.findIndex(i => i.id === id);
                     const shouldExist = (dStr >= safeIn && dStr < safeOut);
 
                     if (shouldExist) {
