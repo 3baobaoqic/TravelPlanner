@@ -50,7 +50,7 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download } from 'lucide-react';
+        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
@@ -116,6 +116,14 @@
         const getDayOfWeek = (d) => ['週日','週一','週二','週三','週四','週五','週六'][new Date(d).getDay()];
         const getMonthDay = (d) => { const date = new Date(d); return `${date.getMonth()+1}/${date.getDate()}`; };
         
+        const toLocalISOString = (date) => {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         const openGoogleMaps = (query) => {
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
         };
@@ -176,6 +184,7 @@
             const [successMessage, setSuccessMessage] = useState(''); 
             const [infoType, setInfoType] = useState(null); 
             const [pendingJoinId, setPendingJoinId] = useState(null); 
+            const [confirmData, setConfirmData] = useState({ open: false, message: '', onConfirm: null });
 
             useEffect(() => {
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
@@ -288,21 +297,25 @@
                     try {
                         const bundle = JSON.parse(cleanId);
                         if (bundle.id && bundle.firebase) {
-                            if (confirm(`偵測到包含 Firebase 設定的旅程代碼 (ID: ${bundle.id})。\n\n是否要自動匯入設定、建立連線並加入旅程？`)) {
-                                localStorage.setItem('gtp_firebase_config', JSON.stringify(bundle.firebase));
-                                if (bundle.imgbb) localStorage.setItem('gtp_imgbb_key', bundle.imgbb);
-                                
-                                setConfigInput(JSON.stringify(bundle.firebase, null, 2).replace(/[{}]/g, '').trim());
-                                setImgbbKey(bundle.imgbb || '');
-                                
-                                setPendingJoinId(bundle.id);
-                                setJoinId(bundle.id); 
-                                
-                                onConnect(bundle.firebase);
-                                
-                                alert("設定已匯入，正在嘗試連線...\n\n連線成功後將自動進入旅程。");
-                                return;
-                            }
+                            setConfirmData({
+                                open: true,
+                                message: `偵測到包含 Firebase 設定的旅程代碼 (ID: ${bundle.id})。\n\n是否要自動匯入設定、建立連線並加入旅程？`,
+                                onConfirm: () => {
+                                    localStorage.setItem('gtp_firebase_config', JSON.stringify(bundle.firebase));
+                                    if (bundle.imgbb) localStorage.setItem('gtp_imgbb_key', bundle.imgbb);
+                                    
+                                    setConfigInput(JSON.stringify(bundle.firebase, null, 2).replace(/[{}]/g, '').trim());
+                                    setImgbbKey(bundle.imgbb || '');
+                                    
+                                    setPendingJoinId(bundle.id);
+                                    setJoinId(bundle.id); 
+                                    
+                                    onConnect(bundle.firebase);
+                                    
+                                    alert("設定已匯入，正在嘗試連線...\n\n連線成功後將自動進入旅程。");
+                                }
+                            });
+                            return;
                         }
                     } catch (e) {
                         console.error("JSON Parse Error", e);
@@ -366,7 +379,18 @@
 
                         <div className="flex gap-2 w-full mb-8">
                             <button 
-                                onClick={onCreateTrip}
+                                onClick={() => {
+                                    const hasImgbb = localStorage.getItem('gtp_imgbb_key');
+                                    if (!hasImgbb) {
+                                        setConfirmData({
+                                            open: true,
+                                            message: "⚠️ 注意：您尚未設定 Imgbb API Key\n\n如果不設定，照片將直接存入資料庫，受限於單一旅程 1MB 的容量上限，您可能只能上傳極少量的照片 (約 3-5 張)。\n\n若您有大量照片紀錄的需求，強烈建議先取得並設定 Imgbb API Key。\n\n確定要繼續建立嗎？",
+                                            onConfirm: onCreateTrip
+                                        });
+                                    } else {
+                                        onCreateTrip();
+                                    }
+                                }}
                                 disabled={testStatus !== 'success'}
                                 className={`flex-1 py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 text-sm
                                     ${testStatus === 'success' ? 'bg-[#0ABAB5] hover:bg-[#008985]' : 'bg-gray-300 cursor-not-allowed'}`}
@@ -402,7 +426,7 @@
                                 </div>
                             </div>
 
-                            {/* Recent Trips Section - Restored */}
+                            {/* Recent Trips Section */}
                             {recentTrips.length > 0 && (
                                 <div className="mt-8">
                                     <h3 className="text-xs font-bold text-gray-400 mb-3 flex items-center gap-2 uppercase tracking-wider"><History size={14}/> 近期瀏覽</h3>
@@ -412,7 +436,6 @@
                                                 <div>
                                                     <div className="font-bold text-gray-700 text-sm flex items-center gap-2">
                                                         {trip.destination || '未命名行程'}
-                                                        {/* 簡單判斷是否為純本機 ID 格式 (trip_開頭) */}
                                                         {trip.id.toString().startsWith('trip_') && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 rounded border border-gray-200">本機</span>}
                                                     </div>
                                                     <div className="text-[10px] text-gray-400 mt-0.5">{trip.dateRange}</div>
@@ -444,6 +467,16 @@
                         title="如何取得 Imgbb API Key"
                         content={`1. 前往 api.imgbb.com\n2. 註冊或登入您的帳號\n3. 點擊 "Get API Key" 按鈕\n4. 複製產生的 Key 並貼上\n\n💡 設定此項可將圖片上傳至 Imgbb 圖床，解決 Firebase Firestore 的 1MB 儲存限制，讓您可以上傳更多、更清晰的照片。`}
                     />
+                    
+                    <ConfirmModal 
+                        isOpen={confirmData.open} 
+                        message={confirmData.message} 
+                        onConfirm={() => {
+                            if (confirmData.onConfirm) confirmData.onConfirm();
+                            setConfirmData({ ...confirmData, open: false });
+                        }} 
+                        onCancel={() => setConfirmData({ ...confirmData, open: false })} 
+                    />
                 </div>
             );
         };
@@ -457,7 +490,7 @@
                     <div className="bg-[#F5FDFC] w-full max-w-xs rounded-2xl p-6 border border-[#eeeeee] relative z-10 flex flex-col items-center text-center">
                         <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-500"><Trash2 size={24} /></div>
                         <h3 className="text-lg font-bold text-gray-800 mb-2">確認</h3>
-                        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+                        <p className="text-gray-600 mb-6 text-sm whitespace-pre-line">{message}</p>
                         <div className="flex gap-3 w-full">
                             <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-gray-500 font-bold bg-gray-200 border border-[#eeeeee]">取消</button>
                             <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold border border-red-500">確定</button>
@@ -529,7 +562,6 @@
 
                         <div className="space-y-3 overflow-y-auto p-1 mb-4 custom-scrollbar">
                             {tripData.members.map((member, index) => {
-                                // FIX: Guard clause for dirty data
                                 if (!member) return null;
 
                                 const isEditing = editingIndex === index;
@@ -675,7 +707,6 @@
                                     <select value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]">
                                         <option value="">-- 請選擇 --</option>
                                         {tripData.members.map(m => {
-                                            // FIX: Guard clause
                                             if (!m) return null;
                                             return <option key={m.name} value={m.name}>{m.name}</option>;
                                         })}
@@ -703,7 +734,6 @@
             const [v, setV] = useState(value ?? '');
             useEffect(() => setV(value ?? ''), [value]);
             
-            // FIX: Ensure comparison handles null/undefined correctly to avoid unnecessary saves when data is dirty
             const handleBlur = () => {
                 const normalizedV = v === null || v === undefined ? '' : String(v);
                 const normalizedValue = value === null || value === undefined ? '' : String(value);
@@ -793,7 +823,6 @@
                                 <div><label className="text-xs text-gray-400 block">付款人</label>{transaction.payer}</div>
                             </div>
                             {transaction.photoUrls?.length > 0 && <div className="flex gap-2 overflow-x-auto">{transaction.photoUrls.map((p, i) => {
-                                // FIX: Guard against null/undefined photos in TransactionDetailModal
                                 if (!p) return null;
                                 const url = typeof p === 'string' ? p : p.url;
                                 return <img key={i} src={url} className="w-20 h-20 object-cover rounded-lg" onClick={() => onViewImage(url)} />;
@@ -809,21 +838,13 @@
 
             return (
                 <div className="bg-[#FFF9C4] border border-yellow-300 shadow-sm rounded-2xl p-1.5 mt-4 relative mb-2">
-                    
                     {(!data || data.length === 0) && <div className="text-center text-yellow-600 text-xs py-1">尚未新增住宿</div>}
-
                     {(data || []).map((item, index) => {
-                        // FIX: Guard clause for dirty data (null items)
                         if (!item) return null;
-
                         const isExpanded = expandedId === item.id;
                         return (
                             <div key={item.id || index} className={index > 0 ? "border-t border-yellow-200 pt-0.5 mt-0.5" : ""}>
-                                {/* Header - Always Visible */}
-                                <div 
-                                    className="flex items-center justify-between cursor-pointer" 
-                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                                >
+                                <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : item.id)}>
                                     <div className="flex items-center gap-1 flex-1 min-w-0 pr-8">
                                         <BedDouble size={14} className="text-gray-600 flex-shrink-0" />
                                         <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
@@ -842,23 +863,30 @@
                                         <ChevronDown size={14} className={`text-yellow-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                                     </div>
                                 </div>
-                                
-                                {/* Details - Collapsible */}
                                 <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                     <div className="pt-1 pb-0.5 space-y-1">
-                                        {/* Modified: Removed Right Column (Check-in/Check-out Boxes) as requested */}
-                                        <div className="flex gap-1 mb-1">
-                                            {/* Left Column - Now takes full width */}
-                                            <div className="flex-1 flex flex-col gap-1 min-w-0 justify-center">
-                                                <div className="pl-1">
-                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="訂房編號" value={item.bookingCode} onSave={(val) => onUpdate(item.id, 'bookingCode', val)} className="text-xs text-gray-500 bg-transparent outline-none w-full"/>
+                                        <div className="flex gap-1 mb-1 items-center px-1">
+                                            <div className="flex-1 min-w-0">
+                                                <AutoSaveInput type="text" readOnly={!isOwner} placeholder="訂房編號" value={item.bookingCode} onSave={(val) => onUpdate(item.id, 'bookingCode', val)} className="text-xs text-gray-500 bg-transparent outline-none w-full" />
+                                            </div>
+                                            <div className="flex flex-col gap-1 flex-shrink-0">
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
+                                                    <LogIn size={10} className="text-green-600 flex-shrink-0" />
+                                                    <input type="date" value={item.checkInDate || ''} onChange={(e) => onUpdate(item.id, 'checkInDate', e.target.value)} onClick={(e) => e.stopPropagation()} disabled={!isOwner} className="text-[10px] bg-transparent outline-none w-[80px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" />
+                                                    <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
+                                                    <select value={item.checkInTime || '15:00'} onChange={(e) => onUpdate(item.id, 'checkInTime', e.target.value)} onClick={(e) => e.stopPropagation()} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                                                 </div>
-                                                <div className="pl-1">
-                                                    <AutoSaveInput type="text" readOnly={!isOwner} placeholder="備註 (Wifi/密碼...)" value={item.note} onSave={(val) => onUpdate(item.id, 'note', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1"/>
+                                                <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-1.5 py-0.5 rounded-lg">
+                                                    <LogOutIcon size={10} className="text-red-500 flex-shrink-0" />
+                                                    <input type="date" value={item.checkOutDate || ''} onChange={(e) => onUpdate(item.id, 'checkOutDate', e.target.value)} onClick={(e) => e.stopPropagation()} disabled={!isOwner} className="text-[10px] bg-transparent outline-none w-[80px] font-bold text-gray-600 border-none cursor-pointer p-0 relative z-10" />
+                                                    <div className="w-px h-2.5 bg-gray-300 mx-0.5"></div>
+                                                    <select value={item.checkOutTime || '10:00'} onChange={(e) => onUpdate(item.id, 'checkOutTime', e.target.value)} onClick={(e) => e.stopPropagation()} disabled={!isOwner} className="text-[10px] bg-transparent outline-none text-gray-600 font-bold appearance-none cursor-pointer relative z-10">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                                                 </div>
                                             </div>
                                         </div>
-                                        
+                                        <div className="px-1">
+                                            <AutoSaveInput type="text" readOnly={!isOwner} placeholder="備註 (Wifi/密碼...)" value={item.note} onSave={(val) => onUpdate(item.id, 'note', val)} className="text-xs text-gray-600 bg-transparent outline-none w-full placeholder-gray-400 border-b border-yellow-200 border-dashed pb-1" />
+                                        </div>
                                         <div className="flex flex-col gap-1">
                                             <div className="flex gap-2 items-stretch">
                                                 <div className="flex items-center gap-1 bg-[#E2E2E2] border border-gray-300 px-2 py-0.5 rounded-lg flex-[3] overflow-hidden">
@@ -873,7 +901,6 @@
                                             </div>
                                             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar mt-0.5">
                                                     {item.photoUrls?.map((p, i) => {
-                                                        // FIX: Handle null photos from dirty data
                                                         if (!p) return null;
                                                         const url = typeof p === 'string' ? p : p.url;
                                                         const uploader = typeof p === 'string' ? 'unknown' : p.uploader;
@@ -888,20 +915,18 @@
                             </div>
                         );
                     })}
-
-                    {/* Button Moved to Bottom Right Outside - Adjusted further down */}
                     {isOwner && <button onClick={onAdd} className="absolute -bottom-6 right-2 bg-yellow-400 text-white shadow-md rounded-full p-1.5 hover:bg-yellow-500 transition-colors z-10 border-2 border-white"><Plus size={14} /></button>}
                 </div>
             );
         };
 
         const FlightCard = ({ label, icon: Icon, data, onUpdate, isOwner }) => (
-            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-3 mb-4 relative border border-[#eeeeee]">
+            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-2 mb-2 relative border border-[#eeeeee]">
                 <div className="absolute top-0 right-0 bg-[#3B82F6] text-white text-[10px] px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold">{label}</div>
-                <div className="flex items-center justify-between mt-2">
-                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-1 placeholder-gray-300" /></div>
-                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-1 transform rotate-45"><Icon size={24} /></div><div className="w-full flex items-center justify-center relative mb-1"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-sm font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
-                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-1 text-right placeholder-gray-300" /></div>
+                <div className="flex items-center justify-between mt-3">
+                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 placeholder-gray-300" /></div>
+                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-0.5 transform rotate-45"><Icon size={20} /></div><div className="w-full flex items-center justify-center relative mb-0.5"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-xs font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
+                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 text-right placeholder-gray-300" /></div>
                 </div>
             </div>
         );
@@ -947,11 +972,9 @@
             const [confirm, setConfirm] = useState({ open: false, idx: null });
             const fileRef = useRef(null);
             
-            // New state for adding category
             const [isAddingCat, setIsAddingCat] = useState(false);
             const [newCatName, setNewCatName] = useState("");
             
-            // FIX: Removed unnecessary dependencies from useEffect to prevent form reset during typing or background updates
             useEffect(() => {
                  if (isOpen) {
                      if (defaultValues) { 
@@ -960,7 +983,6 @@
                              currency: defaultValues.currency || tripData?.currency || 'JPY',
                              payer: defaultValues.payer || currentMember?.name || tripData?.members?.[0]?.name || '我',
                              category: defaultValues.category || '',
-                             // FIX: Ensure date is correctly initialized for editing (using 'date' property)
                              date: defaultValues.date || selectedDate 
                          }); 
                      } else { 
@@ -969,19 +991,16 @@
                              bookingCode: '', cost: '', 
                              currency: tripData?.currency || 'JPY', 
                              payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
-                             category: '', // Will be auto-set by transport effect
+                             category: '',
                              photoUrls: [],
-                             // FIX: Use selectedDate as default for new creation
                              date: selectedDate
                          }); 
                      }
-                     // Reset add category state when opening modal
                      setIsAddingCat(false);
                      setNewCatName("");
                  }
-            }, [isOpen, defaultValues]); // FIX: Reduced dependency array to only what triggers a mode change
+            }, [isOpen, defaultValues, tripData, currentMember, selectedDate]);
 
-            // Effect: Auto-set category based on transport if category is empty
             useEffect(() => {
                 if (!formData.category && isOpen && !defaultValues) {
                     if (['train', 'bus', 'taxi', 'car', 'plane', 'shinkansen', 'nightbus', 'tram'].includes(formData.transport)) {
@@ -995,12 +1014,10 @@
             if (!isOpen) return null;
             const handleSave = () => { 
                 if(!formData.title.trim()) return alert('請輸入名稱'); 
-                // Pass date in data object for cross-date saving
                 onSave({...formData, cost: parseFloat(formData.cost)||0}); 
                 onClose(); 
             };
             
-            // Modified: Use processImageUpload for unified logic
             const handleFile = async (e) => { 
                 const f = e.target.files[0]; 
                 if(f) { 
@@ -1018,35 +1035,28 @@
                     <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
                     <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
                         <div className="bg-[#6A8E83] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯行程' : '新增行程'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
-                        {/* FIX: Added flex-1 to ensure correct scrolling behavior within max-h container */}
                         <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                            {/* FIX: Changed UI structure to include date input */}
                             <div className="flex gap-2">
                                 <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">日期</label><input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                                 <div className="flex-1"><label className="text-xs text-gray-400 font-bold block">時間</label><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
                             </div>
                             <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full p-2 bg-[#E2E2E2] rounded-xl text-sm font-bold text-gray-700 border border-[#eeeeee]" autoFocus /></div>
-                            
                             <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={2} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm resize-none text-gray-700 border border-[#eeeeee]" /></div>
                             <div className="flex gap-2">
                                 <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">交通</label><select value={formData.transport} onChange={e=>setFormData({...formData, transport:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{transportOptions.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
                                 <div className="w-1/2"><label className="text-xs text-gray-400 font-bold block">停留</label><select value={formData.duration} onChange={e=>setFormData({...formData, duration:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{durationOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                             </div>
                             
-                            {/* Cost & Expense Section */}
                             <div className="border-t border-[#eeeeee] pt-2">
                                 <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">費用與記帳</span></div>
                                 <div className="flex gap-2 mb-2 items-start">
                                     <div className="flex-1 flex flex-col gap-2">
-                                        {/* Cost Input - Wrapped for styling match */}
                                         <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee] h-[38px]">
                                             <span className="text-xs text-gray-400">$</span>
                                             <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700 placeholder-gray-400" />
                                         </div>
                                         
-                                        {/* Category - Fixed Display with Add Button */}
                                         <div>
-                                            {/* Header with fixed height to match Payer header */}
                                             <div className="flex justify-between items-center mb-1 h-[16px]">
                                                 <label className="text-[10px] text-gray-400 font-bold">分類</label>
                                                 <button onClick={() => setIsAddingCat(!isAddingCat)} className="text-[10px] text-[#6A8E83] hover:text-[#557269] flex items-center gap-1 font-bold">
@@ -1095,26 +1105,27 @@
                                                 </div>
                                             ) : (
                                                 <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
-                                                    {/* tripData.expenseCategories已經在useEffect中處理過，這裡只需要確保map能正常執行 */}
                                                     {(tripData.expenseCategories || []).map(c=><option key={c} value={c}>{c}</option>)}
                                                 </select>
                                             )}
                                         </div>
                                     </div>
                                     <div className="w-[35%] flex flex-col gap-2">
-                                        {/* Currency Select - Wrapped to match Cost Input height */}
                                         <div className="bg-[#E2E2E2] rounded-xl px-1 border border-[#eeeeee] h-[38px] flex items-center">
                                             <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-transparent p-1 text-sm font-bold text-gray-700 outline-none border-none">
                                                 {currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}
                                             </select>
                                         </div>
                                         
-                                        {/* Payer - Fixed Display */}
                                         <div>
                                             <div className="flex justify-between items-center mb-1 h-[16px]">
                                                 <label className="text-[10px] text-gray-400 font-bold block">付款人</label>
                                             </div>
-                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">{tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}</select>
+                                            <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
+                                                {tripData.members.map(m => (
+                                                    m ? <option key={m.name} value={m.name}>{m.name}</option> : null
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -1128,7 +1139,7 @@
                                 <label className="text-xs text-gray-400 font-bold block mb-2"></label>
                                 <div className="flex gap-2 overflow-x-auto">
                                     {formData.photoUrls?.map((url, i) => (
-                                        <div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={() => setConfirm({open:true, idx:i})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>
+                                        <div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={()=>setConfirm({open:true, idx:i})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>
                                     ))}
                                     <button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16} /></button>
                                     <input type="file" ref={fileRef} className="hidden" onChange={handleFile} />
@@ -1182,7 +1193,6 @@
 
             if (!isOpen) return null;
             
-            // Modified: Use processImageUpload for unified logic
             const handleFile = async (e) => { 
                 const f = e.target.files[0]; 
                 if(f) { 
@@ -1198,12 +1208,17 @@
                     <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
                     <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
                         <div className="bg-[#D68C68] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯記帳' : '新增記帳'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
-                        {/* FIX: Added flex-1 to ensure correct scrolling behavior */}
                         <div className="p-4 space-y-4 overflow-y-auto flex-1">
                             <div className="flex items-end gap-2">
                                 <div className="w-[50%]"><label className="text-xs text-gray-400 font-bold block">金額</label><div className="relative"><DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl pl-7 p-2 text-xl font-bold text-gray-800 border border-[#eeeeee]" autoFocus /></div></div>
                                 <div className="w-[20%]"><label className="text-xs text-gray-400 font-bold block">幣別</label><select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select></div>
-                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label><select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{tripData.members.map(m=><option key={m.name} value={m.name}>{m.name}</option>)}</select></div>
+                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label>
+                                    <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">
+                                        {tripData.members.map(m => (
+                                            m ? <option key={m.name} value={m.name}>{m.name}</option> : null
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-center mb-2"><label className="text-xs text-gray-400 font-bold">分類</label><button onClick={()=>setIsManage(!isManage)} className="text-xs text-[#D68C68] flex items-center gap-1 font-bold"><Settings size={12}/>管理</button></div>
@@ -1230,7 +1245,6 @@
             
             return (
                 <div className="bg-[#0ABAB5] z-10 relative flex flex-col">
-                    {/* Top Row */}
                     <div className="text-white px-3 pt-3 pb-1 flex justify-between items-start">
                         <div className="flex items-center gap-3">
                             <button onClick={() => setIsMenuOpen(true)}><Menu size={24}/></button>
@@ -1243,7 +1257,6 @@
                                     if (isOffline) {
                                         alert("目前為離線模式，無法產生分享連結。");
                                     } else {
-                                        // 產生一鍵分享包
                                         const fbConfigStr = localStorage.getItem('gtp_firebase_config');
                                         const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key');
                                         if (fbConfigStr) {
@@ -1275,9 +1288,7 @@
                         </div>
                     </div>
                     
-                    {/* Bottom Row: Dates + Dollar Button */}
                     <div className="flex items-center pl-2 pr-3 pb-2 gap-2">
-                        {/* Date List */}
                         <div className="flex-1 flex overflow-x-auto space-x-2 no-scrollbar">
                             {datesList.map((d, i) => (
                                 <button 
@@ -1293,39 +1304,32 @@
                             <button onClick={handleAddDate} className="flex-shrink-0 w-10 h-10 flex items-center justify-center border border-dashed border-white/50 rounded-xl text-white"><Plus size={20}/></button>
                         </div>
 
-                        {/* Dollar Button - Centered with dates, Scaled Down 10% */}
                         <button onClick={() => setView(view === 'planner' ? 'expense' : 'planner')} className="flex-shrink-0 w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-yellow-900 ring-2 ring-[#D68C68] transform hover:scale-105 transition-transform">
                             <DollarSign size={20} strokeWidth={3} />
                         </button>
                     </div>
-                    
-                    {/* Export button removed from here */}
-
                 </div>
             );
         };
 
         const App = () => {
             
-            // Lazy Initialize State from LocalStorage
             const getRestoredState = () => {
                 try {
                     const saved = localStorage.getItem('gtp_session_restore');
-                    if (saved) return JSON.parse(saved); // Just read, do NOT remove here
+                    if (saved) return JSON.parse(saved); 
                 } catch(e) {}
                 return null;
             };
             
-            // Initialize from restored state
             const [restored] = useState(getRestoredState);
 
             const [userId, setUserId] = useState(getOrCreateUserId());
-            const [view, setView] = useState(restored?.view || 'landing'); // DEFAULT TO LANDING IF NO RESTORED VIEW
+            const [view, setView] = useState(restored?.view || 'landing'); 
             const [tripId, setTripId] = useState(restored?.tripId || '');
             const [tripData, setTripData] = useState(null);
             const [selectedDate, setSelectedDate] = useState(restored?.selectedDate || '');
             
-            // Fix: Use ref to track selectedDate to avoid stale closure in onSnapshot
             const selectedDateRef = useRef(selectedDate);
             useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
 
@@ -1333,13 +1337,11 @@
             const [expandedId, setExpandedId] = useState(null);
             const [recentTrips, setRecentTrips] = useState([]);
             
-            // Restore setup form data if available
             const [setupForm, setSetupForm] = useState(
                 restored?.setupForm || { 
                     destination: '', 
-                    // Fix: Use local time (en-CA gives YYYY-MM-DD) instead of ISO string (UTC) to avoid incorrect date in early morning
-                    startDate: new Date().toLocaleDateString('en-CA'), 
-                    endDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'), 
+                    startDate: toLocalISOString(new Date()), 
+                    endDate: toLocalISOString(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)), 
                     currency: 'JPY', 
                     nickname: '', 
                     pin: '' 
@@ -1351,44 +1353,37 @@
             const fileRef = useRef(null);
             const [uploadTarget, setUploadTarget] = useState(null);
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
-            const [expenseFilterPayer, setExpenseFilterPayer] = useState('all'); // 新增：付款人篩選狀態
-            const [expenseFilterCurrency, setExpenseFilterCurrency] = useState('all'); // 新增：幣別篩選狀態
+            const [expenseFilterPayer, setExpenseFilterPayer] = useState('all');
+            const [expenseFilterCurrency, setExpenseFilterCurrency] = useState('all');
             const [isCreating, setIsCreating] = useState(false); 
             const [editingActivity, setEditingActivity] = useState(null);
-            const [editingExpense, setEditingExpense] = useState(null); // 新增：正在編輯的記帳項目
+            const [editingExpense, setEditingExpense] = useState(null); 
             const [currentMember, setCurrentMember] = useState(null); 
             const [authError, setAuthError] = useState(null);
             const [connectionTimeout, setConnectionTimeout] = useState(false); 
-            const [isMenuOpen, setIsMenuOpen] = useState(false); // Add missing state
+            const [isMenuOpen, setIsMenuOpen] = useState(false); 
             
-            // Firebase states (default to offline/local)
             const [isOffline, setIsOffline] = useState(true);
-            const [user, setUser] = useState(null); // Auth user
+            const [user, setUser] = useState(null); 
             const unsubscribeRef = useRef(null);
             const authUnsubscribeRef = useRef(null);
             
-            // Derived state placed early to ensure scope availability
             const isOwner = currentMember?.role === 'owner';
             
-            // Load recent trips and cleanup restore state on mount
             useEffect(() => {
                 const storedRecents = localStorage.getItem('gtp_recent_trips');
                 if (storedRecents) {
                     setRecentTrips(JSON.parse(storedRecents));
                 }
                 
-                // Clear restore data AFTER it's been used for initialization
-                // We use a small timeout to ensure the app has fully mounted and state is settled
                 const timer = setTimeout(() => {
                     localStorage.removeItem('gtp_session_restore');
                 }, 500);
 
-                // Check if firebase config exists, try to init (silent mode)
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
                 if (storedConfig) {
                     reInit(JSON.parse(storedConfig));
                 } else {
-                    // Fix: If no config, default to local mode immediately
                     setIsOffline(true);
                     setUser({ uid: 'local' });
                 }
@@ -1397,7 +1392,6 @@
             }, []);
 
             const reInit = async (config) => {
-                 // Cleanup existing auth listener
                  if (authUnsubscribeRef.current) {
                     authUnsubscribeRef.current();
                     authUnsubscribeRef.current = null;
@@ -1405,11 +1399,10 @@
                  
                  if (!config) {
                     setIsOffline(true);
-                    setUser({ uid: 'local' }); // Fix: Set dummy user for local mode
+                    setUser({ uid: 'local' }); 
                     return;
                  }
 
-                 // If we have active apps, try to delete them to start fresh (simple hot reload logic)
                  if (getApps().length > 0) {
                      try {
                         await Promise.all(getApps().map(app => deleteApp(app)));
@@ -1421,20 +1414,12 @@
                     const auth = getAuth(app);
                     const db = getFirestore(app);
                     
-                    // Wait for auth state
                     await signInAnonymously(auth);
 
-                    // --- IDENTITY MIGRATION FIX START ---
-                    // 修正：離線轉線上時的身分識別衝突
-                    // 當 Firebase 連線成功後，檢查本地資料。若發現舊的「離線隨機 ID」，
-                    // 自動將其遷移為新的「Firebase UID」，確保使用者不失去 Owner 權限。
                     const fbUser = auth.currentUser;
                     const localOfflineId = localStorage.getItem('gtp_local_uid');
 
                     if (fbUser && localOfflineId && fbUser.uid !== localOfflineId) {
-                        console.log(`[Identity Migration] Migrating from ${localOfflineId} to ${fbUser.uid}`);
-                        
-                        // FIX: Use for...of to allow await inside loop
                         const keys = Object.keys(localStorage);
                         for (const key of keys) {
                             if (key.startsWith('gtp_trip_')) {
@@ -1444,7 +1429,6 @@
                                         const tripObj = JSON.parse(rawData);
                                         let isModified = false;
 
-                                        // 檢查並更新成員列表中的 deviceId
                                         if (tripObj.members && Array.isArray(tripObj.members)) {
                                             tripObj.members = tripObj.members.map(m => {
                                                 if (m.deviceId === localOfflineId) {
@@ -1456,18 +1440,14 @@
                                         }
 
                                         if (isModified) {
-                                            // 寫回 localStorage
                                             localStorage.setItem(key, JSON.stringify(tripObj));
                                             
-                                            // FIX: Upload migrated data IMMEDIATELY to cloud to prevent onSnapshot from overwriting it with old data
                                             try {
                                                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripObj.id), sanitizeFirestoreData(tripObj));
-                                                console.log(`[Identity Migration] Synced ${tripObj.id} to cloud`);
                                             } catch (uploadErr) {
                                                 console.error("Migration upload failed", uploadErr);
                                             }
 
-                                            // 如果這剛好是當前正在顯示的旅程，同步更新 React State，避免 UI 權限判斷錯誤
                                             if (tripObj.id === tripId) {
                                                 setTripData(tripObj);
                                                 const newSelf = tripObj.members.find(m => m.deviceId === fbUser.uid);
@@ -1481,7 +1461,6 @@
                             }
                         }
                     }
-                    // --- IDENTITY MIGRATION FIX END ---
                     
                     setIsOffline(false);
                     setUser(auth.currentUser);
@@ -1496,7 +1475,6 @@
                      authUnsubscribeRef.current = authUnsub;
                  } catch (e) {
                     console.error("Auto-connect failed", e);
-                    // Fallback to offline mode on error so UI doesn't freeze
                     setIsOffline(true);
                     setUser({ uid: 'offline_fallback' });
                     alert("連線失敗，將切換至離線模式。錯誤: " + e.message);
@@ -1516,7 +1494,6 @@
                  setUser(null);
                  setIsOffline(true);
                  
-                 // Add safety timeout to prevent infinite loading
                  const timeoutId = setTimeout(() => {
                      setUser((currentUser) => {
                          if (currentUser === null) {
@@ -1526,7 +1503,7 @@
                          }
                          return currentUser;
                      });
-                 }, 10000); // 10 seconds timeout
+                 }, 10000); 
 
                  try {
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -1540,7 +1517,6 @@
             };
 
             useEffect(() => {
-                // We don't need to re-run reInit on mount again, it's handled in the first useEffect
                 return () => {
                     if (unsubscribeRef.current) unsubscribeRef.current();
                     if (authUnsubscribeRef.current) authUnsubscribeRef.current();
@@ -1551,11 +1527,8 @@
             useEffect(() => {
                 if (!tripId) return;
 
-                // Helper: Ensure data structure is complete (migration for old data)
-                // 補回這個函式以避免 ReferenceError
                 const processLoadedData = (d) => ({
                     ...d,
-                    // FIX: Ensure flights deep structure exists to prevent crash
                     flights: {
                         outbound: (d.flights && d.flights.outbound) || {},
                         inbound: (d.flights && d.flights.inbound) || {}
@@ -1563,11 +1536,9 @@
                     expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
                     accommodations: d.accommodations || {},
                     itinerary: d.itinerary || {},
-                    // FIX: Ensure members array exists to prevent crash in onSnapshot
                     members: d.members || []
                 });
 
-                // 1. If Offline, load from LocalStorage
                 if (isOffline) {
                     const localData = localStorage.getItem(`gtp_trip_${tripId}`);
                     if (localData) {
@@ -1575,22 +1546,23 @@
                             const d = processLoadedData(JSON.parse(localData));
                             setTripData(d);
                             
-                            if(!selectedDate) setSelectedDate(d.startDate);
+                            if(!selectedDateRef.current) setSelectedDate(d.startDate);
                             
-                            let found = d.members.find(m => m.deviceId === userId);
-                            if (!found && d.members.length > 0) {
-                                 found = d.members.find(m => m.role === 'owner') || d.members[0];
-                            }
+                            // [FIX] 離線模式嚴格身分檢查
+                            const found = d.members.find(m => m.deviceId === userId);
+                            
                             if (found) {
                                 setCurrentMember(found);
-                                // Only force redirect if we were in landing or setup
                                 if(view === 'landing' || view === 'setup') {
                                      setView('planner');
                                      setSelectedDate(d.startDate);
                                 }
+                            } else {
+                                // 找不到身分時：強制清空並彈出加入視窗 (移除原本的自動指派 owner 邏輯)
+                                setCurrentMember(null);
+                                setModals(m => ({...m, join: true}));
                             }
 
-                            // 新增：讀取成功後，更新近期紀錄 (Fix: Update recent trips in offline mode)
                             setRecentTrips(p => { 
                                 const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
                                 localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
@@ -1602,9 +1574,8 @@
                         }
                     }
                 } else {
-                    // 2. If Online, load from Firestore
                     const apps = getApps();
-                    if (apps.length === 0) return; // Safety check
+                    if (apps.length === 0) return;
                     const db = getFirestore(apps[0]);
 
                     if (unsubscribeRef.current) {
@@ -1613,26 +1584,28 @@
                     }
                     
                     const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), 
-                        async (s) => { // Made async to handle auto-upload
+                        async (s) => {
                             if(s.exists()) {
                                 const d = processLoadedData(s.data());
                                 setTripData(d);
                                 
-                                // Fix: Check ref instead of stale state variable to prevent unwanted reset
                                 if(!selectedDateRef.current) setSelectedDate(d.startDate);
                                 
                                 const currentAuthUser = getAuth(apps[0]).currentUser;
                                 if(currentAuthUser) {
+                                    // [FIX] 線上模式嚴格身分檢查
                                     const found = d.members.find(m => m.deviceId === currentAuthUser.uid);
                                     if (found) {
                                         setCurrentMember(found);
-                                        // Force redirect from landing/setup to planner
                                         if(view === 'landing' || view === 'setup') {
                                             setView('planner');
                                             setSelectedDate(d.startDate);
                                         }
+                                        // 確保如果是已驗證成員，加入視窗是關閉的
+                                        setModals(m => ({...m, join: false}));
                                     } else {
-                                        // Force Join Modal for non-members
+                                        // 找不到身分時：強制清空並彈出加入視窗
+                                        setCurrentMember(null);
                                         setModals(m => ({...m, join: true}));
                                     }
                                 }
@@ -1652,7 +1625,6 @@
                                             console.error("Auto-upload failed", e);
                                     }
                                 } else {
-                                     // Not found anywhere
                                      if (!isOffline) {
                                       alert("找不到此旅程 ID，請確認 ID 是否正確。");
                                       setTripId('');
@@ -1670,7 +1642,7 @@
                     );
                     unsubscribeRef.current = unsub;
                 }
-            }, [user, tripId, isOffline]); 
+            }, [user, tripId, isOffline, userId]);
 
             const handleStart = async () => {
                 if (!setupForm.nickname || !setupForm.pin) { alert('請輸入暱稱與 PIN 碼'); return; }
@@ -1734,37 +1706,65 @@
                 if (!tripData) return;
                 
                 if (isOffline) {
-                     const newData = { ...tripData, [field]: val };
-                     setTripData(newData);
-                     localStorage.setItem(`gtp_trip_${tripData.id}`, JSON.stringify(newData));
+                     try {
+                         const newData = { ...tripData, [field]: val };
+                         setTripData(newData);
+                         localStorage.setItem(`gtp_trip_${tripData.id}`, JSON.stringify(newData));
+                     } catch (e) {
+                         console.error("Local update failed", e);
+                         alert("儲存本機資料失敗: " + e.message);
+                     }
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
-                         // FIX: Define db instance before using it in updateDoc
-                         const db = getFirestore(apps[0]);
-                         updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), { [field]: sanitizeFirestoreData(val) })
-                            .catch(e => {
-                                console.error("Update trip failed:", e);
-                                alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
-                            });
+                         try {
+                             if (!tripId) throw new Error("無效的 Trip ID");
+                             
+                             const db = getFirestore(apps[0]);
+                             const validTripId = String(tripId).trim();
+                             if (!validTripId) throw new Error("Trip ID 為空");
+
+                             updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', validTripId), { [field]: sanitizeFirestoreData(val) })
+                                .catch(e => {
+                                    console.error("Update trip failed (async):", e);
+                                    alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
+                                });
+                         } catch (e) {
+                             console.error("Update trip failed (sync):", e);
+                             alert("系統錯誤 (同步): " + e.message);
+                         }
                      }
                 }
             };
             
             const updateTripFull = (newData) => {
                 if (isOffline) {
-                     setTripData(newData);
-                     localStorage.setItem(`gtp_trip_${newData.id}`, JSON.stringify(newData));
+                     try {
+                         setTripData(newData);
+                         localStorage.setItem(`gtp_trip_${newData.id}`, JSON.stringify(newData));
+                     } catch (e) {
+                         console.error("Local full update failed", e);
+                         alert("儲存本機資料失敗: " + e.message);
+                     }
                 } else {
                      const apps = getApps();
                      if (apps.length > 0) {
-                         // FIX: Define db instance before using it in setDoc
-                         const db = getFirestore(apps[0]);
-                         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(newData))
-                            .catch(e => {
-                                console.error("Update full trip failed:", e);
-                                alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
-                            });
+                         try {
+                             if (!tripId) throw new Error("無效的 Trip ID");
+
+                             const db = getFirestore(apps[0]);
+                             const validTripId = String(tripId).trim();
+                             if (!validTripId) throw new Error("Trip ID 為空");
+
+                             setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', validTripId), sanitizeFirestoreData(newData))
+                                .catch(e => {
+                                    console.error("Update full trip failed (async):", e);
+                                    alert("儲存失敗，請檢查網路或權限。\n錯誤: " + e.message);
+                                });
+                         } catch (e) {
+                             console.error("Update full trip failed (sync):", e);
+                             alert("系統錯誤 (同步): " + e.message);
+                         }
                      }
                 }
             }
@@ -1789,36 +1789,20 @@
                 if(!isOwner) return;
                 const updatedTrip = { ...tripData, ...newData };
                 
-                // Check if date range changed
                 if (newData.startDate !== tripData.startDate || newData.endDate !== tripData.endDate) {
                      const newDates = getDatesArray(newData.startDate, newData.endDate);
-                     
-                     // FIX: 1. Prevent orphaned data by rebuilding objects based ONLY on the new date range
                      const cleanItinerary = {};
                      const cleanAccoms = {};
-                     
                      newDates.forEach(d => { 
-                         // Keep existing data if within new range, otherwise initialize empty
                          cleanItinerary[d] = tripData.itinerary[d] || []; 
-                         
-                         // Keep existing accoms if within new range, otherwise initialize default
                          cleanAccoms[d] = tripData.accommodations[d] || [{ 
-                             id: generateId(), 
-                             name: '', 
-                             bookingCode: '', 
-                             checkInTime: '', 
-                             checkOutDate: '', 
-                             checkOutTime: '', 
-                             phone: '', 
-                             address: '', 
-                             photoUrls: [] 
+                             id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] 
                          }]; 
                      });
                      
                      updatedTrip.itinerary = cleanItinerary; 
                      updatedTrip.accommodations = cleanAccoms; 
                      
-                     // Smart redirect: Only change date if current selection is invalid
                      if (!newDates.includes(selectedDate)) {
                          setSelectedDate(newDates[0]); 
                      }
@@ -1833,58 +1817,39 @@
                 if(idx>=0) { acts[idx][field]=val; updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); } 
             };
 
-            // FIX: Rewritten to be robust and clear for Create/Update operations
             const handleSaveActivity = (data) => {
-                if (!isOwner) {
-                    alert("您沒有權限修改此行程");
-                    return;
-                }
+                if (!isOwner) return; 
                 
-                const targetDate = data.date || selectedDate; // Fallback
+                const targetDate = data.date;
+                const oldDate = editingActivity?.date || selectedDate;
+                const activityId = editingActivity?.id || generateId();
+                const activityCreator = editingActivity?.createdBy || currentMember.name;
+
                 const activityData = { ...data };
-                delete activityData.date; // Remove temp field
+                delete activityData.date; 
                 
                 const newItinerary = { ...tripData.itinerary };
-                
-                // Ensure target array exists and is CLONED to trigger React state update
-                if (!newItinerary[targetDate]) {
-                    newItinerary[targetDate] = [];
-                } else {
-                    newItinerary[targetDate] = [...newItinerary[targetDate]];
-                }
 
                 if (editingActivity) {
-                    // --- Update Mode ---
-                    const oldDate = editingActivity.date || selectedDate;
-                    const activityId = editingActivity.id;
-                    
                     if (oldDate !== targetDate) {
-                        // Date changed: Remove from old date
                         if (newItinerary[oldDate]) {
                             newItinerary[oldDate] = newItinerary[oldDate].filter(a => a.id !== activityId);
                         }
                     } else {
-                        // Same date: Remove old version to be replaced
-                        newItinerary[targetDate] = newItinerary[targetDate].filter(a => a.id !== activityId);
+                        newItinerary[targetDate] = (newItinerary[targetDate] || []).filter(a => a.id !== activityId);
                     }
-                    
-                    // Add updated version
-                    newItinerary[targetDate].push({
-                        ...activityData,
-                        id: activityId,
-                        createdBy: editingActivity.createdBy
-                    });
-                } else {
-                    // --- Create Mode ---
-                    const newId = generateId();
-                    newItinerary[targetDate].push({
-                        ...activityData,
-                        id: newId,
-                        createdBy: currentMember.name
-                    });
                 }
+
+                if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
+                if (!editingActivity) {
+                    newItinerary[targetDate] = newItinerary[targetDate].filter(a => a.id !== activityId);
+                }
+                newItinerary[targetDate].push({
+                    id: activityId,
+                    ...activityData,
+                    createdBy: activityCreator
+                });
                 
-                // If date changed, switch view to that date
                 if (selectedDate !== targetDate) {
                    setSelectedDate(targetDate);
                 }
@@ -1893,27 +1858,19 @@
                 setEditingActivity(null);
             };
 
-            // New: Handle saving expenses (create and update with date change support)
             const handleSaveExpense = (data) => {
                 const targetDate = data.date;
                 const cost = parseFloat(data.cost);
-                
-                // Prepare expense object (without temporary date field)
                 const expenseData = { ...data, cost, transport: 'expense' };
                 delete expenseData.date;
 
                 const newItinerary = { ...tripData.itinerary };
 
                 if (editingExpense) {
-                    // Update Mode
                     const oldDate = editingExpense.originalDate;
-                    
-                    // 1. Remove from old date
                     if (newItinerary[oldDate]) {
                         newItinerary[oldDate] = newItinerary[oldDate].filter(e => e.id !== editingExpense.id);
                     }
-                    
-                    // 2. Add to new date (keep original ID and creator)
                     if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
                     newItinerary[targetDate].push({
                         ...expenseData,
@@ -1921,7 +1878,6 @@
                         createdBy: editingExpense.createdBy
                     });
                 } else {
-                    // Create Mode
                     if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
                     newItinerary[targetDate].push({
                         id: generateId(),
@@ -1933,7 +1889,6 @@
                 updateTrip('itinerary', newItinerary);
                 setModals(m => ({ ...m, expense: false }));
                 setEditingExpense(null);
-                // setView('expense'); // Removed to stay on current view
             };
             
             const deleteActivity = (id) => {
@@ -1955,8 +1910,6 @@
             const handleJoinTrip = async (memberInfo) => {
                  const { name, pin, role, isNew } = memberInfo;
                  let newMembers = [...tripData.members];
-                 
-                 // Determine ID based on mode
                  const currentUid = isOffline ? userId : (user ? user.uid : userId);
                  
                  if (isNew) {
@@ -1966,25 +1919,18 @@
                  }
  
                  updateTrip('members', newMembers);
-                 
-                 // Update local state immediately
                  const switchedMember = newMembers.find(m => m.name === name) || newMembers[newMembers.length - 1];
                  if(switchedMember) setCurrentMember(switchedMember);
-                 
                  setModals(m => ({...m, join: false}));
             };
 
             const handleLocalJoin = (targetId) => {
-                // 優先使用 targetId，若無則使用 joinId，並強制移除前後空白，避免複製貼上時出錯
                 const rawId = targetId !== undefined ? targetId : joinId;
                 const idToJoin = (rawId || '').toString().trim();
                 
                 if (!idToJoin) return;
-                
-                // 【修復白屏關鍵】切換 ID 時先清空舊資料，避免渲染錯誤或殘留
                 setTripData(null); 
 
-                // 1. Always check local storage first (fastest)
                 const localData = localStorage.getItem(`gtp_trip_${idToJoin}`);
                 if (localData) {
                     setTripId(idToJoin);
@@ -1992,9 +1938,7 @@
                     return;
                 }
 
-                // 2. If not local, check connectivity
                 if (isOffline) {
-                    // Check if they simply haven't configured it yet
                     const hasConfig = localStorage.getItem('gtp_firebase_config');
                     if (hasConfig) {
                         alert("找不到本機資料，且目前尚未成功連線至雲端。\n\n請檢查網路，或點擊上方「測試連線」確認設定是否正確。");
@@ -2002,7 +1946,6 @@
                         alert("找不到本機資料。\n\n若這是一個雲端行程 ID，請確認：\n1. 上方 Firebase 設定是否正確\n2. 是否已點擊「儲存連線」按鈕 (需看到綠色 Wifi 燈號)");
                     }
                 } else {
-                    // 3. Online: Try to fetch from cloud (via useEffect)
                      setTripId(idToJoin);
                      setView('planner');
                 }
@@ -2029,7 +1972,6 @@
 
             const handleDeleteDate = () => {
                 if (!isOwner) return;
-                
                 const dates = getDatesArray(tripData.startDate, tripData.endDate);
                 if (dates.length <= 1) {
                     alert("旅程至少需要保留一天，無法刪除最後一天。");
@@ -2046,7 +1988,6 @@
                         const newItinerary = { ...tripData.itinerary };
                         const newAccommodations = { ...tripData.accommodations };
 
-                        // 將後面的日期資料往前搬移
                         for (let i = targetIndex; i < dates.length - 1; i++) {
                             const currDate = dates[i];
                             const nextDate = dates[i+1];
@@ -2054,126 +1995,80 @@
                             newAccommodations[currDate] = newAccommodations[nextDate] || [];
                         }
 
-                        // 刪除最後一天的資料 (因為已經移到前一天了，或者本來就是空的)
                         const oldEndDate = dates[dates.length - 1];
                         delete newItinerary[oldEndDate];
                         delete newAccommodations[oldEndDate];
 
-                        // 計算新的結束日期 (減一天)
                         const newEndDateObj = new Date(tripData.endDate);
                         newEndDateObj.setDate(newEndDateObj.getDate() - 1);
                         const newEndDate = newEndDateObj.toISOString().split('T')[0];
 
-                        // 決定刪除後要停留在哪一天
-                        // 如果刪除的是最後一天，就跳到新的最後一天；否則停留在原日期(因為後面的補上來了)
                         let newSelectedDate = selectedDate;
                         if (selectedDate > newEndDate) {
                             newSelectedDate = newEndDate;
                         }
 
-                        const newData = {
-                            ...tripData,
-                            endDate: newEndDate,
-                            itinerary: newItinerary,
-                            accommodations: newAccommodations
-                        };
-
+                        const newData = { ...tripData, endDate: newEndDate, itinerary: newItinerary, accommodations: newAccommodations };
                         updateTripFull(newData);
                         setSelectedDate(newSelectedDate);
                     }
                 });
             };
 
-            // Modified: Enhanced logic to handle date changes (cleanup old dates) and prevent duplicate blank cards
             const handleUpdateAccommodation = (id, field, val) => { 
                 if(!isOwner) return; 
-                
                 const newAccommodations = { ...tripData.accommodations };
-                
-                // Get current date's list
                 if (!newAccommodations[selectedDate]) newAccommodations[selectedDate] = [];
                 let currentList = [...newAccommodations[selectedDate]];
-                
-                // 1. Find and update the item in the current date
                 const itemIndex = currentList.findIndex(item => item.id === id);
                 if (itemIndex === -1) return;
                 
                 const oldItem = currentList[itemIndex];
-                
-                // FIX: Update the specific field in the current item copy
                 const updatedItem = { ...oldItem, [field]: val };
                 currentList[itemIndex] = updatedItem;
                 newAccommodations[selectedDate] = currentList;
 
-                // Helper to check if a date string is within a range [start, end)
-                // FIX: Use string comparison to avoid timezone issues with Date parsing
                 const isInRange = (dStr, start, end) => {
                     if (!start || !end) return false;
                     return dStr >= start && dStr < end; 
                 };
 
-                // 2. Logic to Sync to other dates
-                
-                // --- Determine the fields that need synchronization ---
-                // FIX: Added time fields to sync list so changes reflect immediately
                 const fieldsToSync = ['name', 'bookingCode', 'note', 'phone', 'address', 'photoUrls', 'checkInTime', 'checkOutTime'];
                 const isFieldToSync = fieldsToSync.includes(field);
-                
-                // --- Determine range changes ---
                 const rangeChanged = (updatedItem.checkInDate !== oldItem.checkInDate) || (updatedItem.checkOutDate !== oldItem.checkOutDate);
                 
-                // Only run complex range sync logic if needed
                 if (rangeChanged || isFieldToSync) {
-
-                    // Collect all dates in the current trip range
                     const allDates = getDatesArray(tripData.startDate, tripData.endDate);
-
                     allDates.forEach(dateStr => {
-                        // Skip if the current date hasn't been initialized in accommodations yet
                         if (!newAccommodations[dateStr]) return;
-                        
-                        // Check if this item should exist on this day based on the new date range
-                        const shouldExist = updatedItem.checkInDate && updatedItem.checkOutDate 
-                            ? isInRange(dateStr, updatedItem.checkInDate, updatedItem.checkOutDate)
-                            : dateStr === selectedDate; // Fallback: only exists on its creation day if dates aren't set
+                        const hasDates = updatedItem.checkInDate && updatedItem.checkOutDate;
+                        const validDates = hasDates && updatedItem.checkInDate < updatedItem.checkOutDate;
+                        const shouldExist = validDates ? isInRange(dateStr, updatedItem.checkInDate, updatedItem.checkOutDate) : dateStr === selectedDate; 
 
                         let dayList = [...newAccommodations[dateStr]];
                         const existingIdx = dayList.findIndex(i => i.id === id);
 
                         if (shouldExist) {
-                            // Item should exist on this day
                             if (existingIdx > -1) {
-                                // 存在：更新所有欄位
-                                // Use oldItem properties if the specific field wasn't changed now (only sync changed date fields)
                                 if (rangeChanged) {
-                                    // Range changed: full sync of all linked items
                                     dayList[existingIdx] = { ...updatedItem };
                                 } else if (isFieldToSync) {
-                                    // Content changed: sync only the changed content field
                                     dayList[existingIdx] = { ...dayList[existingIdx], [field]: val };
                                 }
-                                
-                            } else if (dateStr !== updatedItem.checkOutDate) { // Avoid adding to checkout date itself
-                                // 不存在：如果不是當前編輯的日期，且在新的範圍內，則添加副本
-                                // First remove placeholder if exists
+                            } else if (dateStr !== updatedItem.checkOutDate) { 
                                 if (dayList.length === 1 && !dayList[0].name && !dayList[0].bookingCode) {
                                     dayList = [];
                                 }
                                 dayList.push({ ...updatedItem });
                             }
                         } else {
-                            // Item should NOT exist on this day: Remove it
                             if (existingIdx > -1) {
                                 dayList.splice(existingIdx, 1);
                             }
                         }
-
-                        // Update the accommodations map for this date
                         newAccommodations[dateStr] = dayList.filter(Boolean);
                     });
                 }
-                // --- End Sync Logic ---
-                
                 updateTrip('accommodations', newAccommodations);
             };
 
@@ -2183,14 +2078,11 @@
             const handlePhotoUpload = async (e) => {
                 const f = e.target.files[0];
                 if (f && uploadTarget) {
-                    // Modified: Use processImageUpload for unified logic
                     const finalUrl = await processImageUpload(f);
-                    
                     if (finalUrl) {
                         const photoObj = { url: finalUrl, uploader: currentMember.name };
                         const newPhotoUrls = [...(uploadTarget.data?.photoUrls || []), photoObj];
 
-                        // Logic to sync photoUrls across multiple components/dates
                         if (uploadTarget.type === 'activity') {
                             const acts = [...tripData.itinerary[selectedDate]];
                             const idx = acts.findIndex(a=>a.id===uploadTarget.id);
@@ -2199,15 +2091,12 @@
                                 updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
                             }
                         } else if (uploadTarget.type === 'accom') {
-                            // Special case for accommodation: Need to update all linked dates
                             const newAccoms = { ...tripData.accommodations };
                             const allDates = getDatesArray(tripData.startDate, tripData.endDate);
-
                             allDates.forEach(dateStr => {
                                 if (newAccoms[dateStr]) {
                                     newAccoms[dateStr] = newAccoms[dateStr].map(item => {
                                         if (item.id === uploadTarget.id) {
-                                            // The core accommodation object is modified here
                                             return { ...item, photoUrls: newPhotoUrls };
                                         }
                                         return item;
@@ -2233,8 +2122,7 @@
                             acts[idx].photoUrls = acts[idx].photoUrls.filter(p => (typeof p === 'string' ? p : p.url) !== urlToDelete); 
                             updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
                         }
-                    } else { // type === 'accom'
-                        // FIX: Iterate all dates to remove the photo from all linked copies
+                    } else { 
                         allDates.forEach(dateStr => {
                             if (newAccoms[dateStr]) {
                                 newAccoms[dateStr] = newAccoms[dateStr].map(item => {
@@ -2253,7 +2141,6 @@
                 }});
             };
 
-            // FIX: Added handleExportExpenses function
             const handleExportExpenses = () => {
                 if (!tripData || !tripData.itinerary) {
                     alert("無記帳資料可匯出！");
@@ -2266,7 +2153,6 @@
                 allDates.forEach(date => {
                     const dayActs = tripData.itinerary[date] || [];
                     dayActs.filter(a => a && (a.transport === 'expense' || (a.cost && a.cost > 0))).forEach(e => {
-                        // FIX: Extract photo URL safely, showing multiple URLs joined by a separator
                         let photoUrlsJoined = 'N/A';
                         if (e.photoUrls && e.photoUrls.length > 0) {
                             photoUrlsJoined = e.photoUrls.map(p => typeof p === 'string' ? p : p.url).join('; ');
@@ -2276,11 +2162,11 @@
                             date: date,
                             time: e.time || 'N/A',
                             payer: e.payer || 'N/A',
-                            name: e.title || 'N/A', // FIX: Map DB 'title' to Export 'name' for consistency
+                            name: e.title || 'N/A', 
                             category: e.category || 'N/A',
                             cost: e.cost || 0,
                             currency: e.currency || tripData.currency || 'TWD',
-                            photoUrls: photoUrlsJoined // FIX: Include joined photo URLs
+                            photoUrls: photoUrlsJoined 
                         });
                     });
                 });
@@ -2290,11 +2176,8 @@
                     return;
                 }
 
-                // Prepare CSV content
-                // FIX: Added Category and Photos to header
                 const header = ["日期", "時間", "付款人", "名稱", "分類", "價格 (金額)", "價格 (幣別)", "照片連結"];
                 
-                // Helper to format string for CSV (handle commas/quotes)
                 const escapeCsv = (str) => {
                     if (str === null || str === undefined) return "";
                     str = String(str);
@@ -2308,22 +2191,19 @@
                     escapeCsv(e.date),
                     escapeCsv(e.time),
                     escapeCsv(e.payer),
-                    escapeCsv(e.name), // FIX: Use consistent 'name' field
+                    escapeCsv(e.name),
                     escapeCsv(e.category),
                     escapeCsv(e.cost),
                     escapeCsv(e.currency),
-                    escapeCsv(e.photoUrls) // FIX: Add photo links
+                    escapeCsv(e.photoUrls)
                 ]);
                 
-                // FIX: Add BOM marker (\ufeff) to the beginning of the CSV content for Chinese compatibility in Excel
                 const BOM = '\ufeff';
-
                 const csvContent = [
                     header.join(','),
                     ...rows.map(row => row.join(','))
                 ].join('\n');
 
-                // Trigger download
                 const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 if (link.download !== undefined) {
@@ -2339,16 +2219,27 @@
                 }
             };
 
-            // Modified: Group statistics by currency to allow vertical stacking of charts
             const expenseStatsByCurrency = useMemo(() => {
                 if (!tripData) return [];
                 
-                // Determine which currencies to calculate (Selected one or All available in constants)
                 let targetCurrencies = [];
                 if (expenseFilterCurrency !== 'all') {
                     targetCurrencies = [expenseFilterCurrency];
                 } else {
-                    targetCurrencies = currencies.map(c => c.value);
+                    const usedCurrencies = new Set(currencies.map(c => c.value)); 
+                    
+                    if (tripData.itinerary) {
+                        Object.values(tripData.itinerary).forEach(dayActs => {
+                            if (Array.isArray(dayActs)) {
+                                dayActs.forEach(act => {
+                                    if (act && (act.transport === 'expense' || (act.cost && parseFloat(act.cost) > 0))) {
+                                        if (act.currency) usedCurrencies.add(act.currency);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    targetCurrencies = Array.from(usedCurrencies);
                 }
 
                 const datesToShow = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
@@ -2359,12 +2250,8 @@
                     const catTotals = {};
                     currentCategories.forEach(c => catTotals[c] = 0);
 
-                    // Calculate Bar Data (Daily Breakdown) & Accumulate Totals
                     const barData = datesToShow.map(date => {
                          const dayActs = tripData.itinerary?.[date] || [];
-                         
-                         // Filter relevant expenses for this day, payer, and THIS specific currency loop
-                         // FIX: Added guard check (!a) to prevent crash on dirty data (null/undefined in array)
                          const relevant = dayActs.filter(a => 
                             a && 
                             (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
@@ -2392,7 +2279,6 @@
                              catTotals[cat] = (catTotals[cat] || 0) + cost;
                          });
                          
-                         // Format breakdown for SimpleBarChart
                          const breakdown = Object.keys(dayCatBreakdown).map(cat => ({
                              category: cat,
                              cost: dayCatBreakdown[cat],
@@ -2402,7 +2288,6 @@
                          return { date, total: dayTotal, breakdown };
                     });
 
-                    // Format Pie Data
                     const pieData = Object.keys(catTotals)
                         .filter(k => catTotals[k] > 0)
                         .map(k => ({ 
@@ -2410,10 +2295,8 @@
                             value: catTotals[k], 
                             color: CATEGORY_COLORS[k] || '#ccc' 
                         }))
-                        .sort((a, b) => b.value - a.value); // Sort by value descending
+                        .sort((a, b) => b.value - a.value); 
 
-                    // Hide currency group if total is 0 AND user selected 'all' (to avoid empty charts)
-                    // But if user explicitly selected this currency, show it even if empty (0)
                     if (expenseFilterCurrency === 'all' && totalForCurrency === 0) return null;
 
                     return {
@@ -2422,7 +2305,7 @@
                         pieData,
                         barData
                     };
-                }).filter(Boolean); // Remove nulls
+                }).filter(Boolean); 
             }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]);
 
             const sortedExpensesByDate = useMemo(() => {
@@ -2430,8 +2313,6 @@
                 const dates = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
                 const expenseList = [];
                 dates.forEach(date => {
-                    // 針對列表資料，加入付款人與幣別篩選
-                    // FIX: Added guard check (!a) to prevent crash on dirty data
                     const dayExpenses = (tripData.itinerary?.[date] || []).filter(a => 
                         a &&
                         (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
@@ -2441,24 +2322,19 @@
                     if (dayExpenses.length > 0) { expenseList.push({ date, items: dayExpenses }); }
                 });
                 return expenseList;
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); 
 
             const sortedActivities = useMemo(() => {
                 const acts = tripData?.itinerary?.[selectedDate] || [];
-                // FIX: Add fallback for missing time to prevent crash
-                // Also added filter(Boolean) to remove nulls before sort
                 return [...acts].filter(Boolean).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
             }, [tripData, selectedDate]);
 
             if (authError || connectionTimeout) return <div className="flex h-screen items-center justify-center bg-red-50 p-8"><div className="bg-[#F5FDFC] p-6 rounded-2xl shadow-xl max-w-md text-center"><h2 className="text-2xl font-bold text-red-500 mb-2">{authError ? "Firebase 驗證錯誤" : "連線逾時"}</h2><button onClick={() => window.location.reload()} className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">重試</button></div></div>;
 
-            // Pass session data to modal so it can save it before reloading
             const currentSessionData = { view, tripId, selectedDate, setupForm };
 
             return (
                 <div className="w-full max-w-[480px] h-screen bg-[#E0F2F1] shadow-2xl flex flex-col overflow-hidden relative mx-auto border-x border-[#eeeeee]">
-                    
-                    {/* --- Conditional Content Rendering --- */}
                     {!user ? (
                         <div className="flex h-full items-center justify-center text-[#0ABAB5] font-bold animate-pulse">
                             載入中...
@@ -2479,12 +2355,9 @@
                                 />
                             ) : (
                                 <>
-                                    {/* Menu Overlay */}
                                     <div className={`absolute inset-0 z-50 bg-black/50 ${!isMenuOpen && 'hidden'}`} onClick={()=>setIsMenuOpen(false)}>
                                         <div className="w-72 bg-[#F5FDFC] h-full p-4" onClick={e=>e.stopPropagation()}>
                                             <h2 className="text-lg font-bold text-[#0ABAB5] mb-4">Travel Plan</h2>
-                                            
-                                            {/* Trip ID Display */}
                                             {tripData && view !== 'setup' && (
                                                 <div className="mb-4 p-3 bg-[#EDF7F6] border border-[#eeeeee] rounded-xl shadow-sm">
                                                     <label className="text-[10px] font-bold text-gray-400 block mb-1">
@@ -2494,12 +2367,9 @@
                                                         className="text-xl font-bold text-gray-700 flex items-center gap-2 cursor-pointer active:scale-95 transition-transform"
                                                         onClick={() => {
                                                             const textArea = document.createElement("textarea");
-                                                            
-                                                            // NEW: 一鍵分享邏輯 (與 Header 按鈕邏輯一致)
                                                             let textToCopy = tripData.id;
                                                             let alertMsg = isOffline ? "已複製本機 ID (此 ID 僅能在此瀏覽器上讀取)" : "ID 已複製，傳送給朋友即可加入旅程！";
 
-                                                            // 只有在連線模式下，才嘗試打包設定檔
                                                             if (!isOffline) {
                                                                 const fbConfigStr = localStorage.getItem('gtp_firebase_config');
                                                                 const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key');
@@ -2539,15 +2409,25 @@
                                                 <Plus size={18} /> 建立新旅程
                                             </button>
                                             {view !== 'setup' && (
-                                                <button 
-                                                    onClick={() => { setModals({ ...modals, members: true }); setIsMenuOpen(false); }} 
-                                                    className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
-                                                >
-                                                    <Users size={18} /> 旅伴管理
-                                                </button>
+                                                <>
+                                                    <button 
+                                                        onClick={() => { setModals({ ...modals, members: true }); setIsMenuOpen(false); }} 
+                                                        className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
+                                                    >
+                                                        <Users size={18} /> 旅伴管理
+                                                    </button>
+                                                    
+                                                    {isOwner && (
+                                                        <button 
+                                                            onClick={() => { setModals({ ...modals, editTrip: true }); setIsMenuOpen(false); }} 
+                                                            className="w-full text-left p-3 hover:bg-gray-100 rounded-xl mb-2 flex items-center gap-3 font-bold text-gray-600"
+                                                        >
+                                                            <Edit3 size={18} /> 旅程設定
+                                                        </button>
+                                                    )}
+                                                </>
                                             )}
                                             
-                                            {/* Button to go back to Landing Page (Firebase Setup) */}
                                             <div className="mt-4 pt-4 border-t border-gray-200">
                                                 <button 
                                                     onClick={() => {
@@ -2564,15 +2444,12 @@
 
                                     {view === 'setup' && (
                                         <div className="p-8 h-full flex flex-col relative">
-                                            {/* Header Area */}
                                             <div className="flex justify-center items-center mb-6 relative">
                                                 <h2 className="text-3xl font-bold text-[#0ABAB5]">Travel Planner</h2>
                                             </div>
 
-                                            {/* Content Area - Only Create Mode Now */}
                                             <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
                                                 <div className="space-y-4">
-                                                    {/* Header "建立新旅程" removed here */}
                                                     <div className="space-y-3 p-1">
                                                         <input placeholder="目的地" value={setupForm.destination} onChange={e=>setSetupForm({...setupForm, destination:e.target.value})} className="w-full p-3 border border-[#eeeeee] bg-[#E2E2E2] rounded-xl outline-none focus:ring-2 focus:ring-[#0ABAB5] text-gray-700 font-bold" />
                                                         <div className="flex gap-2">
@@ -2593,7 +2470,6 @@
                                         </div>
                                     )}
 
-                                    {/* Planner & Expense Views */}
                                     {(view === 'planner' || view === 'expense') && (
                                         !tripData ? (
                                             <div className="flex h-full items-center justify-center flex-col gap-4 text-gray-400">
@@ -2603,31 +2479,16 @@
                                             </div>
                                         ) : (
                                         <>
-                                            {/* PASS EXPORT HANDLER TO HEADER */}
                                             <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} onManageMembers={() => setModals({ ...modals, members: true })} isOffline={isOffline} onExportExpenses={handleExportExpenses} />
                                             
                                             <div className="flex-1 overflow-y-auto p-4 pb-24">
                                                 {view === 'planner' ? (
                                                     <>
                                                         <div className="grid grid-cols-2 gap-3 mb-4">
-                                                            {/* FIX: Pass selectedDate to ActivityModal */}
                                                             {isOwner && <button onClick={()=>setModals({...modals, activity:true})} className="py-2 rounded-xl bg-[#6A8E83] text-white font-bold flex justify-center items-center gap-2 border border-[#6A8E83] shadow-sm active:scale-95 transition-transform"><Plus size={18}/> 新增行程</button>}
                                                             <button onClick={()=>setModals({...modals, expense:true})} className={`py-2 rounded-xl bg-[#D68C68] text-white font-bold flex justify-center items-center gap-2 border border-[#D68C68] shadow-sm active:scale-95 transition-transform ${!isOwner ? 'col-span-2' : ''}`}><DollarSign size={18}/> 記帳</button>
                                                         </div>
 
-                                                        {/* Day Total Summary */}
-                                                        {(() => {
-                                                            const dayCost = sortedActivities.reduce((sum, act) => sum + (parseFloat(act.cost) || 0), 0);
-                                                            if (dayCost > 0) return (
-                                                                <div className="flex justify-end items-center gap-2 mb-2 px-1">
-                                                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">預估支出</span>
-                                                                    <span className="text-sm font-bold text-gray-600">${dayCost.toLocaleString()}</span>
-                                                                </div>
-                                                            );
-                                                            return null;
-                                                        })()}
-
-                                                        {/* Fix: Added unique keys to FlightCards to prevent state leakage */}
                                                         {selectedDate === tripData.startDate && <FlightCard key="outbound" label="去程" icon={Plane} data={tripData.flights.outbound} onUpdate={(f,v)=>updateTrip('flights', {...tripData.flights, outbound: {...tripData.flights.outbound, [f]:v}})} isOwner={isOwner} />}
                                                         {selectedDate === tripData.endDate && <FlightCard key="inbound" label="回程" icon={Plane} data={tripData.flights.inbound} onUpdate={(f,v)=>updateTrip('flights', {...tripData.flights, inbound: {...tripData.flights.inbound, [f]:v}})} isOwner={isOwner} />}
                                                         <div className="space-y-3">
@@ -2663,7 +2524,6 @@
                                                                                     </div>
                                                                                 </div>
                                                                                 <div className="flex gap-2 overflow-x-auto">{act.photoUrls?.map((p,i) => { 
-                                                                                    // FIX: Guard clause for dirty data (null photos)
                                                                                     if (!p) return null;
                                                                                     const url = typeof p === 'string' ? p : p.url; 
                                                                                     return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}<button onClick={()=>{setUploadTarget({type:'activity', id:act.id}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={16}/></button></div>
@@ -2687,7 +2547,6 @@
                                                         )}
                                                     </>
                                                 ) : (
-                                                    // Expense View
                                                     <div className="space-y-6">
                                                         <div className="flex flex-col gap-3 mb-2">
                                                             <div className="flex justify-between items-center">
@@ -2695,7 +2554,6 @@
                                                                     <History size={20} className="text-[#D68C68]" /> 交易紀錄
                                                                 </h3>
                                                                 
-                                                                {/* Button is now correctly positioned outside h3, and the parent flex container ensures alignment */}
                                                                 <button
                                                                     onClick={handleExportExpenses}
                                                                     className="flex items-center justify-center p-1.5 bg-[#D68C68]/20 hover:bg-[#D68C68]/30 text-[#D68C68] rounded-full transition-colors"
@@ -2705,9 +2563,7 @@
                                                                 </button>
                                                             </div>
                                                             
-                                                            {/* 篩選器區域 */}
                                                             <div className="flex gap-2 w-full">
-                                                                {/* 付款人篩選 */}
                                                                 <div className="relative flex-1">
                                                                     <select 
                                                                         value={expenseFilterPayer} 
@@ -2716,7 +2572,6 @@
                                                                     >
                                                                         <option value="all">所有成員</option>
                                                                         {tripData.members.map(m => (
-                                                                            // FIX: Guard clause
                                                                             m ? <option key={m.name} value={m.name}>{m.name}</option> : null
                                                                         ))}
                                                                     </select>
@@ -2725,7 +2580,6 @@
                                                                     </div>
                                                                 </div>
 
-                                                                {/* 日期篩選 */}
                                                                 <div className="relative flex-1">
                                                                     <select 
                                                                         value={expenseFilterDate} 
@@ -2742,7 +2596,6 @@
                                                                     </div>
                                                                 </div>
 
-                                                                {/* 幣別篩選 */}
                                                                 <div className="relative flex-1">
                                                                     <select 
                                                                         value={expenseFilterCurrency} 
@@ -2761,7 +2614,6 @@
                                                             </div>
                                                         </div>
                                                         
-                                                        {/* Modified: Statistics Section Moved to Top */}
                                                         {expenseStatsByCurrency.length === 0 && sortedExpensesByDate.length > 0 ? (
                                                             <div className="text-center text-gray-400 text-xs mt-4">無統計數據</div>
                                                         ) : (
@@ -2776,7 +2628,6 @@
                                                                         <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
                                                                         <SimplePieChart data={stat.pieData} />
                                                                         
-                                                                        {/* New: Category Breakdown List */}
                                                                         <div className="mt-6 space-y-2">
                                                                             {stat.pieData.map(item => (
                                                                                 <div key={item.category} className="flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0">
@@ -2798,7 +2649,6 @@
                                                                         <SimpleBarChart data={stat.barData} />
                                                                     </div>
 
-                                                                    {/* Total Expense */}
                                                                     <div className="bg-[#FFF3E0] p-4 rounded-xl border border-[#FFE0B2] flex justify-between items-center shadow-sm">
                                                                         <span className="font-bold text-[#D68C68] text-sm">總支出 ({stat.currency})</span>
                                                                         <span className="font-bold text-[#D68C68] text-2xl">${stat.total.toLocaleString()}</span>
@@ -2832,7 +2682,6 @@
                                                                                         </div>
                                                                                         <div className="flex items-center gap-3">
                                                                                             <div className="text-red-500 font-bold text-sm bg-red-50 px-2 py-1 rounded-lg">-{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span></div>
-                                                                                            {/* Edit Button */}
                                                                                             {(isOwner || e.createdBy === currentMember?.name) && (
                                                                                                 <button 
                                                                                                     onClick={(evt) => { 
@@ -2896,7 +2745,6 @@
                                 </>
                             )}
                             
-                            {/* GLOBAL MODALS */}
                             <ConfirmModal isOpen={confirm.open} message={confirm.msg} onConfirm={()=>{confirm.action(); setConfirm({open:false})}} onCancel={()=>setConfirm({open:false})} />
                         </>
                     )}
