@@ -213,21 +213,29 @@
             }, [isOffline, pendingJoinId, onJoin]);
 
             const parseConfig = (str) => {
+                // 1. 嘗試直接 JSON Parse (針對完整複製貼上的標準 JSON)
                 try {
                     return JSON.parse(str);
                 } catch (e) {
-                    const obj = {};
-                    const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
-                    let found = false;
-                    keys.forEach(key => {
-                        const regex = new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`, 'i');
-                        const match = str.match(regex);
-                        if (match && match[1]) {
-                            obj[key] = match[1];
-                            found = true;
-                        }
-                    });
-                    return found ? obj : null;
+                    // 2. 嘗試補上大括號後 Parse (針對系統自動格式化後移除了大括號的字串)
+                    try {
+                        return JSON.parse(`{${str}}`);
+                    } catch (e2) {
+                        // 3. Regex 解析 Fallback (針對 JS 物件格式或其他非標準格式)
+                        const obj = {};
+                        const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+                        let found = false;
+                        keys.forEach(key => {
+                            // [FIX] 修改 Regex: 允許 Key 前後有引號 (["']?) 
+                            // 解決 "apiKey": "..." 格式無法被辨識的問題
+                            const regex = new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']+)["']`, 'i');
+                            const match = str.match(regex);
+                            if (match && match[1]) {
+                                obj[key] = match[1];
+                                found = true;
+                            }
+                        });
+                        return found ? obj : null;
                 }
             };
 
