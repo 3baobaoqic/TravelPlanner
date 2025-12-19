@@ -574,7 +574,7 @@
                             <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
                         </div>
                         <div className="p-2 bg-yellow-50 rounded mb-2 text-xs text-yellow-600 border border-yellow-100">
-                           單機模式下，可在此新增虛擬旅伴以進行分帳。
+                           可修改自己的暱稱與 PIN 碼 (供登入驗證用)。
                         </div>
 
                         <div className="space-y-3 overflow-y-auto p-1 mb-4 custom-scrollbar">
@@ -583,10 +583,12 @@
                                 if (!member) return null;
 
                                 const isEditing = editingIndex === index;
-                                // CRITICAL FIX: Add safe check for currentMember
-                                const isSelf = member.name === currentMember?.name; 
+                                
+                                // [CRITICAL FIX] 優先使用 deviceId 判斷是否為自己， fallback 才是名字比對
+                                const isSelf = (member.deviceId && currentMember?.deviceId && member.deviceId === currentMember.deviceId) || member.name === currentMember?.name;
                                 const isMemberOwner = member.role === 'owner';
-                                // [MODIFIED] Allow owner to edit everyone, and anyone to edit themselves
+                                
+                                // 允許 擁有者 修改所有人，或 任何人 修改自己
                                 const canEdit = isOwner || isSelf; 
                                 const canRemove = isOwner && !isMemberOwner; 
 
@@ -1972,7 +1974,14 @@
 
             const handleUpdateMember = (index, newInfo) => {
                 const newMembers = [...tripData.members];
-                newMembers[index] = { ...newMembers[index], ...newInfo };
+                const updatedMember = { ...newMembers[index], ...newInfo };
+                newMembers[index] = updatedMember;
+                
+                // [FIX] 如果更新的是自己，立即同步更新 App 的 currentMember 狀態，避免權限遺失
+                if (currentMember && (updatedMember.deviceId === currentMember.deviceId || updatedMember.name === currentMember.name)) {
+                    setCurrentMember(updatedMember);
+                }
+                
                 updateTrip('members', newMembers);
             };
 
