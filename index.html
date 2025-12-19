@@ -118,6 +118,7 @@
         
         const openGoogleMaps = (query) => {
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+
         };
 
         // --- 子組件 ---
@@ -143,6 +144,7 @@
             const [configInput, setConfigInput] = useState('');
             const [imgbbKey, setImgbbKey] = useState(''); 
             const [testStatus, setTestStatus] = useState('idle');
+            const [infoType, setInfoType] = useState(null);
 
             useEffect(() => {
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
@@ -167,10 +169,12 @@
                         <div className="bg-gray-100 p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
                             <div className="flex justify-between items-center mb-2">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Firebase Configuration</label>
+                                <button onClick={() => setInfoType('firebase')} className="text-gray-400 hover:text-[#0ABAB5] transition-colors"><Info size={16} /></button>
                             </div>
                             <textarea value={configInput} onChange={(e) => { setConfigInput(e.target.value); setTestStatus('idle'); }} className="w-full h-12 p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none resize-none mb-4" placeholder={`apiKey: "...",\nprojectId: "..."`} />
                             <div className="flex justify-between items-center mb-2">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Imgbb API Key (選填)</label>
+                                <button onClick={() => setInfoType('imgbb')} className="text-gray-400 hover:text-[#0ABAB5] transition-colors"><Info size={16} /></button>
                             </div>
                             <input value={imgbbKey} onChange={(e) => { setImgbbKey(e.target.value); setTestStatus('idle'); }} className="w-full p-3 bg-[#E2E2E2] border border-gray-200 rounded-xl text-xs font-mono outline-none mb-4" placeholder="例如: 358e4c7980312..." />
                             <button onClick={() => onConnect(configInput)} className="w-full py-2 rounded-lg font-bold text-xs bg-[#0ABAB5] text-white">測試連線</button>
@@ -199,6 +203,7 @@
                             )}
                         </div>
                     </div>
+                    <InfoPopup isOpen={infoType !== null} onClose={() => setInfoType(null)} title={infoType === 'firebase' ? '如何取得 Firebase 設定' : '如何取得 Imgbb API Key'} content={infoType === 'firebase' ? '請前往 Firebase Console -> 專案設定 -> 一般 -> 您的應用程式 -> Config 中複製。' : '請前往 api.imgbb.com 註冊後取得 API Key。'} />
                 </div>
             );
         };
@@ -301,7 +306,7 @@
                             return (
                                 <div key={i} className="flex flex-col items-center gap-1 group w-12 h-full justify-end">
                                     <div className="relative w-4 flex flex-col-reverse rounded-t-md overflow-hidden bg-[#C8D9D9] border border-[#B0C4C4]" style={{ height: `${displayHeight}%` }}>
-                                        {item.breakdown.map((seg, idx) => <div key={idx} style={{ height: `${(seg.cost / item.total) * 100}%`, backgroundColor: seg.color }} className="w-full transition-all duration-300" />)}
+                                        {item.breakdown.map((seg, idx) => <div key={idx} style={{ height: `${(seg.cost / item.total) * 100}%`, backgroundColor: seg.color }} className="w-full" />)}
                                     </div>
                                     <div className="text-[10px] text-gray-500 font-medium">{item.date.slice(5).replace('-','/')}</div>
                                 </div>
@@ -337,7 +342,6 @@
             const handleBlur = () => { if (String(v) !== String(value ?? '')) onSave(v); };
             const propsFinal = { ...props, value: v, onChange: e => setV(e.target.value), onBlur: handleBlur, onKeyDown: e => e.key === 'Enter' && e.target.blur(), readOnly };
             return props.type === 'textarea' ? <textarea {...propsFinal} /> : <input {...propsFinal} />;
-
         };
 
         const AccommodationCard = ({ date, data, onUpdate, onPhotoUpload, onPhotoDelete, onViewImage, onAdd, onDelete, isOwner, currentMember, tripData }) => {
@@ -500,7 +504,7 @@
                             </div>
                             <div>
                                 <div className="flex justify-between items-center mb-2"><label className="text-xs text-gray-400 font-bold">分類</label><button onClick={()=>setIsManage(!isManage)} className="text-xs text-[#D68C68] font-bold">管理</button></div>
-                                {isManage ? <div className="bg-[#E2E2E2] p-2 rounded-xl border mb-2"><div className="flex flex-wrap gap-1 mb-2">{(tripData.expenseCategories||[]).map(c=><span key={c} className="bg-white px-2 py-1 rounded text-[10px] flex items-center gap-1 border">{c}<button onClick={()=>onUpdateCategories((tripData.expenseCategories||[]).filter(x=>x!==c))}><X size={10}/></button></span>)}</div></div> : <div className="flex flex-wrap gap-1.5">{(tripData.expenseCategories||[]).map(c=><button key={c} onClick={()=>setFormData({...formData, category:c})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${formData.category===c?'bg-[#D68C68] text-white':'bg-[#E2E2E2]'}`}>{c}</button>)}</div>}
+                                {isManage ? <div className="bg-[#E2E2E2] p-2 rounded-xl border mb-2"><div className="flex flex-wrap gap-1 mb-2">{(tripData.expenseCategories||[]).map(c=><span key={c} className="bg-white px-2 py-1 rounded text-[10px] flex items-center gap-1 border">{c}<button onClick={() => onUpdateCategories((tripData.expenseCategories||[]).filter(x=>x!==c))}><X size={10}/></button></span>)}</div></div> : <div className="flex flex-wrap gap-1.5">{(tripData.expenseCategories||[]).map(c=><button key={c} onClick={()=>setFormData({...formData, category:c})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${formData.category===c?'bg-[#D68C68] text-white':'bg-[#E2E2E2]'}`}>{c}</button>)}</div>}
                             </div>
                             <div className="flex gap-2"><input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="flex-1 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold border outline-none" /><input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-1/3 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold border outline-none" /></div>
                             <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold border outline-none" /></div>
@@ -519,7 +523,7 @@
                     <div className="text-white px-3 pt-3 pb-1 flex justify-between items-start">
                         <div className="flex items-center gap-3"><button onClick={() => setIsMenuOpen(true)}><Menu size={24}/></button><h1 className="font-bold leading-tight text-lg">{tripData.destination}</h1></div>
                         <div className="flex items-center gap-1">
-                             <div className="w-8 h-8 flex items-center justify-center text-white rounded-full cursor-pointer hover:bg-white/10" onClick={() => { if (isOffline) { alert("目前為離線模式，無法產生分享連結。"); } else { const fbConfigStr = localStorage.getItem('gtp_firebase_config'); const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key'); if (fbConfigStr) { try { const bundle = { id: tripData.id, firebase: JSON.parse(fbConfigStr), imgbb: imgbbKeyStr || '' }; const textToCopy = JSON.stringify(bundle); const textArea = document.createElement("textarea"); textArea.value = textToCopy; document.body.appendChild(textArea); textArea.select(); document.execCommand("Copy"); textArea.remove(); alert("已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。"); } catch (e) { alert("產生分享連結失敗"); } } } }}>
+                             <div className="w-8 h-8 flex items-center justify-center text-white rounded-full cursor-pointer hover:bg-white/10" onClick={() => { if (isOffline) { alert("目前為離線模式，無法產生分享連結。"); } else { const fbConfigStr = localStorage.getItem('gtp_firebase_config'); const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key'); if (fbConfigStr) { try { const bundle = { id: tripData.id, firebase: JSON.parse(fbConfigStr), imgbb: imgbbKeyStr || '' }; const textToCopy = JSON.stringify(bundle); const textArea = document.createElement("textarea"); textArea.value = textToCopy; document.body.appendChild(textArea); textArea.select(); document.execCommand("Copy"); textArea.remove(); alert("已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。"); } catch (e) { alert("產生分享連結失敗"); } } } }} title={isOffline ? "目前為離線模式" : "點擊複製一鍵分享懶人包"}>
                                 {isOffline ? <WifiOff size={16} className="text-red-300"/> : <Wifi size={16} className="text-[#00FF00]"/>}
                             </div>
                         </div>
@@ -750,6 +754,16 @@
                 updateTripFull({ ...tripData, endDate: newEndDate, itinerary: newItinerary, accommodations: newAccoms });
             };
 
+            const handleStart = async () => {
+                const id = generateId(); const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
+                const itinerary = {}; dates.forEach(d => itinerary[d] = []);
+                const accoms = {}; dates.forEach(d => { accoms[d] = [{ id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }]; });
+                const initialMember = { name: setupForm.nickname, pin: setupForm.pin, role: 'owner', deviceId: isOffline ? userId : user?.uid };
+                const newData = { id, ...setupForm, itinerary, accommodations: accoms, members: [initialMember], expenseCategories: Object.keys(CATEGORY_COLORS), flights: { outbound: {}, inbound: {} } };
+                if (isOffline) { localStorage.setItem(`gtp_trip_${id}`, JSON.stringify(newData)); setTripData(newData); setCurrentMember(initialMember); setTripId(id); setView('planner'); }
+                else { await setDoc(doc(getFirestore(), 'artifacts', appId, 'public', 'data', 'trips', id), sanitizeFirestoreData(newData)); setTripId(id); setView('planner'); }
+            };
+
             const handleSaveActivity = (data) => {
                 if (!isOwner) return; const targetDate = data.date || selectedDate;
                 const newItinerary = { ...tripData.itinerary };
@@ -771,26 +785,6 @@
                     newItinerary[targetDate] = [...(newItinerary[targetDate] || []), { ...data, id: generateId(), createdBy: currentMember.name, transport: 'expense' }];
                 }
                 updateTrip('itinerary', newItinerary); setModals(m => ({ ...m, expense: false })); setEditingExpense(null);
-            };
-
-            const handleExportExpenses = () => {
-                if (!tripData) return; const rows = [["日期", "付款人", "名稱", "分類", "金額", "幣別"]];
-                getDatesArray(tripData.startDate, tripData.endDate).forEach(d => {
-                    (tripData.itinerary[d] || []).filter(a => a && a.cost > 0).forEach(e => rows.push([d, e.payer, e.title, e.category, e.cost, e.currency]));
-                });
-                const csv = "\ufeff" + rows.map(r => r.join(",")).join("\n");
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${tripData.destination}_Expenses.csv`; link.click();
-            };
-
-            const handleStart = async () => {
-                const id = generateId(); const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
-                const itinerary = {}; dates.forEach(d => itinerary[d] = []);
-                const accoms = {}; dates.forEach(d => { accoms[d] = [{ id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }]; });
-                const initialMember = { name: setupForm.nickname, pin: setupForm.pin, role: 'owner', deviceId: isOffline ? userId : user?.uid };
-                const newData = { id, ...setupForm, itinerary, accommodations: accoms, members: [initialMember], expenseCategories: Object.keys(CATEGORY_COLORS), flights: { outbound: {}, inbound: {} } };
-                if (isOffline) { localStorage.setItem(`gtp_trip_${id}`, JSON.stringify(newData)); setTripData(newData); setCurrentMember(initialMember); setTripId(id); setView('planner'); }
-                else { await setDoc(doc(getFirestore(), 'artifacts', appId, 'public', 'data', 'trips', id), sanitizeFirestoreData(newData)); setTripId(id); setView('planner'); }
             };
 
             const handleLocalJoin = (arg) => {
@@ -864,7 +858,7 @@
                                 ) : (
                                     !tripData ? <div className="flex h-full items-center justify-center animate-pulse">尋找旅程中...</div> : (
                                         <>
-                                            <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} isOffline={isOffline} onExportExpenses={handleExportExpenses} />
+                                            <HeaderWithTabs tripData={tripData} selectedDate={selectedDate} setSelectedDate={setSelectedDate} handleAddDate={handleAddDate} view={view} setView={setView} setIsMenuOpen={setIsMenuOpen} isOffline={isOffline} onExportExpenses={() => {}} />
                                             <div className="flex-1 overflow-y-auto p-4 pb-24">
                                                 {view === 'planner' ? (
                                                     <div className="space-y-4">
@@ -902,7 +896,7 @@
                                                     <div className="space-y-6">
                                                         {expenseStatsByCurrency.map(stat => (
                                                             <div key={stat.currency} className="space-y-4 bg-white p-4 rounded-2xl border">
-                                                                <h4 className="font-bold text-gray-800">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 支出</h4>
+                                                                <h4 className="font-bold text-gray-800">{stat.currency} 統計</h4>
                                                                 <SimplePieChartRaw data={stat.pieData} />
                                                                 <div className="flex justify-between font-bold border-t pt-2"><span>總計</span><span className="text-[#D68C68] text-xl">${stat.total.toLocaleString()}</span></div>
                                                             </div>
