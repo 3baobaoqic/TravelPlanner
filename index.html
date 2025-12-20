@@ -3074,6 +3074,16 @@
                                                             </div>
                                                         </div>
                                                         
+                                                        {/* [NEW] 統計維度切換 (依類別 vs 依成員) */}
+                                                        <div className="flex bg-[#E2E2E2] p-1 rounded-xl mb-2">
+                                                            <button onClick={() => setExpenseViewMode('category')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'category' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>
+                                                                <PieChart size={12} /> 依類別
+                                                            </button>
+                                                            <button onClick={() => setExpenseViewMode('member')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'member' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>
+                                                                <Users size={12} /> 依成員分攤
+                                                            </button>
+                                                        </div>
+
                                                         {/* Modified: Statistics Section Moved to Top */}
                                                         {expenseStatsByCurrency.length === 0 && sortedExpensesByDate.length > 0 ? (
                                                             <div className="text-center text-gray-400 text-xs mt-4">無統計數據</div>
