@@ -1725,25 +1725,32 @@
             useEffect(() => {
                 if (!tripId) return;
 
-                // Helper: Ensure data structure is complete (migration for old data)
-                const processLoadedData = (d) => ({
-                    ...d,
-                    flights: {
-                        outbound: (d.flights && d.flights.outbound) || {},
-                        inbound: (d.flights && d.flights.inbound) || {}
-                    },
-                    expenseCategories: d.expenseCategories || Object.keys(CATEGORY_COLORS),
-                    accommodations: d.accommodations || {},
-                    itinerary: d.itinerary || {},
-                    members: d.members || []
-                });
+                // [CRITICAL FIX] 強化資料處理函式：嚴格檢查型別
+                // 確保 members 和 expenseCategories 絕對是陣列，防止讀取舊資料時白屏
+                const processLoadedData = (d) => {
+                    if (!d) return null;
+                    return {
+                        ...d,
+                        flights: {
+                            outbound: (d.flights && d.flights.outbound) || {},
+                            inbound: (d.flights && d.flights.inbound) || {}
+                        },
+                        // 如果不是陣列，強制使用預設值
+                        expenseCategories: Array.isArray(d.expenseCategories) ? d.expenseCategories : Object.keys(CATEGORY_COLORS),
+                        accommodations: d.accommodations || {},
+                        itinerary: d.itinerary || {},
+                        // 如果不是陣列，強制設為空陣列
+                        members: Array.isArray(d.members) ? d.members : []
+                    };
+                };
 
                 // 1. If Offline, load from LocalStorage
                 if (isOffline) {
                     const localData = localStorage.getItem(`gtp_trip_${tripId}`);
                     if (localData) {
                         try {
-                            const d = processLoadedData(JSON.parse(localData));
+                            const rawData = JSON.parse(localData);
+                            const d = processLoadedData(rawData); // 使用強化版的處理函式
                             setTripData(d);
                             
                             // Fix: Check ref instead of stale state variable to prevent unwanted reset
@@ -1789,7 +1796,7 @@
                     const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), 
                         async (s) => {
                             if(s.exists()) {
-                                const d = processLoadedData(s.data());
+                                const d = processLoadedData(s.data()); // 使用強化版的處理函式
                                 setTripData(d);
                                 
                                 if(!selectedDateRef.current) setSelectedDate(d.startDate);
@@ -1823,7 +1830,9 @@
                                 if (localData) {
                                     try {
                                             console.log("Auto-uploading local data to Firebase...");
-                                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(d));
+                                            // Process data before upload to ensure integrity
+                                            const cleanData = processLoadedData(JSON.parse(localData));
+                                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(cleanData));
                                     } catch (e) {
                                             console.error("Auto-upload failed", e);
                                     }
