@@ -2,6 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
+    <!-- [MODIFIED] 修改 viewport 設定：移除 user-scalable=no，並允許最大放大到 5 倍 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Travel Plan</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -455,12 +456,13 @@
                                                     </div>
                                                     <div className="text-[10px] text-gray-400 mt-0.5">{trip.dateRange}</div>
                                                 </div>
+                                                {/* [MODIFIED] 移除 opacity-0 group-hover:opacity-100 讓垃圾桶常時顯示 */}
                                                 <button 
                                                     onClick={(e) => onDeleteTrip(trip.id, e)} 
-                                                    className="p-2 text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                                                     title="移除紀錄"
                                                 >
-                                                    <Trash2 size={14} />
+                                                    <Trash2 size={16} />
                                                 </button>
                                             </div>
                                         ))}
