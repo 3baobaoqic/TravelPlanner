@@ -3182,7 +3182,12 @@
                                                                                 <span className="text-[10px] text-gray-400">({getDayOfWeek(date)})</span>
                                                                             </div>
                                                                             <div className="space-y-2">
-                                                                                {items.map(e => (
+                                                                                {items.map(e => {
+                                                                                    // [FIX] 統一權限判斷：擁有者 或 該筆記帳建立者 才有權限
+                                                                                    // 排除住宿項目 (因為住宿在行程頁管理)
+                                                                                    const canEdit = !e.isAccommodation && (isOwner || e.createdBy === currentMember?.name);
+                                                                                    
+                                                                                    return (
                                                                                     <div key={e.id} onClick={() => !e.isAccommodation && setModals({...modals, transaction:e})} className={`flex justify-between items-center bg-[#EDF7F6] p-2.5 rounded-lg border border-[#E0F2F1] ${!e.isAccommodation ? 'active:scale-[0.99] transition-transform cursor-pointer' : ''}`}>
                                                                                         <div className="flex flex-col">
                                                                                             <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
@@ -3194,8 +3199,9 @@
                                                                                         </div>
                                                                                         <div className="flex items-center gap-3">
                                                                                             <div className="text-red-500 font-bold text-sm bg-red-50 px-2 py-1 rounded-lg">-{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span></div>
-                                                                                            {/* Edit Button - Hide for Accommodation items as they are edited in Planner */}
-                                                                                            {!e.isAccommodation && (isOwner || e.createdBy === currentMember?.name) && (
+                                                                                            
+                                                                                            {/* Edit Button */}
+                                                                                            {canEdit && (
                                                                                                 <button 
                                                                                                     onClick={(evt) => { 
                                                                                                         evt.stopPropagation(); 
@@ -3207,10 +3213,23 @@
                                                                                                     <Edit3 size={16} />
                                                                                                 </button>
                                                                                             )}
-                                                                                            {!e.isAccommodation && <button onClick={(evt) => { evt.stopPropagation(); deleteTransaction(e.id, date, e); }} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"><Trash2 size={16} /></button>}
+                                                                                            
+                                                                                            {/* Delete Button */}
+                                                                                            {canEdit && (
+                                                                                                <button 
+                                                                                                    onClick={(evt) => { 
+                                                                                                        evt.stopPropagation(); 
+                                                                                                        deleteTransaction(e.id, date, e); 
+                                                                                                    }} 
+                                                                                                    className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"
+                                                                                                >
+                                                                                                    <Trash2 size={16} />
+                                                                                                </button>
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
-                                                                                ))}
+                                                                                );
+                                                                                })}
                                                                             </div>
                                                                         </div>
                                                                     ))}
