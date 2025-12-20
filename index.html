@@ -1662,9 +1662,10 @@
                     // 1. 基礎結構與外層陣列檢查
                     let cleanData = {
                         ...d,
+                        // [FIX] Ensure flights object exists and has correct shape
                         flights: {
-                            outbound: (d.flights && d.flights.outbound) || {},
-                            inbound: (d.flights && d.flights.inbound) || {}
+                            outbound: (d.flights && typeof d.flights === 'object' && d.flights.outbound) || {},
+                            inbound: (d.flights && typeof d.flights === 'object' && d.flights.inbound) || {}
                         },
                         expenseCategories: Array.isArray(d.expenseCategories) ? d.expenseCategories : Object.keys(CATEGORY_COLORS),
                         // [FIX] Filter out null/invalid members to prevent crash in statistics
@@ -1758,10 +1759,22 @@
                                     localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
                                     return newRecents; 
                                 });
+                            } else {
+                                throw new Error("資料結構無效");
                             }
                         } catch (e) {
                             console.error("Error loading local data", e);
-                            alert("讀取本機資料時發生錯誤");
+                            alert("讀取本機資料時發生錯誤，請重試或檢查資料。");
+                            // [FIX] Reset tripId to prevent stuck loading screen
+                            setTripId('');
+                            setView('landing');
+                        }
+                    } else {
+                        // Local data not found (should be handled by LandingView, but double check here)
+                        if (view !== 'setup') { // Don't alert if we just came from setup (race condition)
+                             alert("找不到此旅程的本機資料。");
+                             setTripId('');
+                             setView('landing');
                         }
                     }
                 } else {
@@ -1846,53 +1859,58 @@
             const handleStart = async () => {
                 if (!setupForm.nickname || !setupForm.pin) { alert('請輸入暱稱與 PIN 碼'); return; }
                 
-                const id = generateId();
-                const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
-                const itinerary = {}; dates.forEach(d => itinerary[d] = []);
-                const accoms = {}; dates.forEach(d => { accoms[d] = [{ id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }]; });
-                
-                const currentUid = isOffline ? userId : (user ? user.uid : userId);
-                
-                const initialMember = { name: setupForm.nickname, pin: setupForm.pin, role: 'owner', deviceId: currentUid };
-                
-                const newData = { 
-                    id, 
-                    ...setupForm, 
-                    ownerPin: setupForm.pin,
-                    itinerary, 
-                    accommodations: accoms, 
-                    createdAt: Date.now(), 
-                    members: [initialMember], 
-                    expenseCategories: Object.keys(CATEGORY_COLORS), 
-                    flights: { outbound: {}, inbound: {} } 
-                };
-                
-                if (isOffline) {
-                    localStorage.setItem(`gtp_trip_${id}`, JSON.stringify(newData));
-                    const newRecent = [{id: newData.id, destination: newData.destination, dateRange: `${newData.startDate.slice(5)} - ${newData.endDate.slice(5)}`}, ...recentTrips].slice(0, 5);
-                    setRecentTrips(newRecent);
-                    localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecent));
-                    setTripData(newData);
-                    setCurrentMember(initialMember);
-                    setTripId(id);
-                    setView('planner');
-                } else {
-                     const apps = getApps();
-                     if (apps.length > 0) {
-                         const db = getFirestore(apps[0]);
-                         setIsCreating(true);
-                         try {
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', id), sanitizeFirestoreData(newData));
-                            setTripId(id);
-                            setCurrentMember(initialMember);
-                            setView('planner');
-                         } catch (e) {
-                             console.error(e);
-                             alert("建立失敗: " + e.message);
-                         } finally {
-                             setIsCreating(false);
+                try {
+                    const id = generateId();
+                    const dates = getDatesArray(setupForm.startDate, setupForm.endDate);
+                    const itinerary = {}; dates.forEach(d => itinerary[d] = []);
+                    const accoms = {}; dates.forEach(d => { accoms[d] = [{ id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }]; });
+                    
+                    const currentUid = isOffline ? userId : (user ? user.uid : userId);
+                    
+                    const initialMember = { name: setupForm.nickname, pin: setupForm.pin, role: 'owner', deviceId: currentUid };
+                    
+                    const newData = { 
+                        id, 
+                        ...setupForm, 
+                        ownerPin: setupForm.pin,
+                        itinerary, 
+                        accommodations: accoms, 
+                        createdAt: Date.now(), 
+                        members: [initialMember], 
+                        expenseCategories: Object.keys(CATEGORY_COLORS), 
+                        flights: { outbound: {}, inbound: {} } 
+                    };
+                    
+                    if (isOffline) {
+                        localStorage.setItem(`gtp_trip_${id}`, JSON.stringify(newData));
+                        const newRecent = [{id: newData.id, destination: newData.destination, dateRange: `${newData.startDate.slice(5)} - ${newData.endDate.slice(5)}`}, ...recentTrips].slice(0, 5);
+                        setRecentTrips(newRecent);
+                        localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecent));
+                        setTripData(newData);
+                        setCurrentMember(initialMember);
+                        setTripId(id);
+                        setView('planner');
+                    } else {
+                         const apps = getApps();
+                         if (apps.length > 0) {
+                             const db = getFirestore(apps[0]);
+                             setIsCreating(true);
+                             try {
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', id), sanitizeFirestoreData(newData));
+                                setTripId(id);
+                                setCurrentMember(initialMember);
+                                setView('planner');
+                             } catch (e) {
+                                 console.error(e);
+                                 alert("建立失敗: " + e.message);
+                             } finally {
+                                 setIsCreating(false);
+                             }
                          }
-                     }
+                    }
+                } catch (err) {
+                    console.error("Create trip critical error:", err);
+                    alert("建立旅程時發生錯誤 (可能是儲存空間不足): " + err.message);
                 }
             };
 
