@@ -810,9 +810,9 @@
                                     className="flex items-center justify-between cursor-pointer" 
                                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                 >
-                                    <div className="flex items-center gap-2 flex-1 min-w-0 pr-8">
+                                    <div className="flex items-center gap-1 flex-1 min-w-0 pr-8">
                                         <BedDouble size={14} className="text-gray-600 flex-shrink-0" />
-                                        <div onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center">
+                                        <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
                                             <AutoSaveInput 
                                                 type="text" 
                                                 readOnly={!isOwner} 
@@ -896,7 +896,7 @@
                                             </div>
                                         </div>
                                         
-                                        {/* Updated: Note Input Row now includes Expense fields to the right */}
+                                        {/* Note Input Row */}
                                         <div className="px-1 flex gap-2 items-center">
                                             <div className="flex-[2] min-w-0">
                                                 <AutoSaveInput 
@@ -1657,6 +1657,8 @@
                 // Helper: Ensure data structure is complete (migration for old data)
                 const processLoadedData = (d) => ({
                     ...d,
+                    startDate: d.startDate || new Date().toISOString().split('T')[0], // CRITICAL FIX: Ensure dates exist
+                    endDate: d.endDate || new Date().toISOString().split('T')[0], // CRITICAL FIX: Ensure dates exist
                     flights: {
                         outbound: (d.flights && d.flights.outbound) || {},
                         inbound: (d.flights && d.flights.inbound) || {}
@@ -2555,11 +2557,14 @@
 
                 if (isByMember) {
                     // Mode: By Member
-                    groupKeys = tripData.members.map(m => m.name);
+                    // [CRITICAL FIX] Ensure we don't crash on null members
+                    const validMembers = (tripData.members || []).filter(m => m && m.name);
+                    groupKeys = validMembers.map(m => m.name);
+                    
                     // Use a distinct palette for members
                     const MEMBER_PALETTE = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B6B', '#C9CBCF', '#4D5360', '#F7464A'];
                     getColor = (name) => {
-                        const idx = tripData.members.findIndex(m => m.name === name);
+                        const idx = validMembers.findIndex(m => m.name === name);
                         return idx >= 0 ? MEMBER_PALETTE[idx % MEMBER_PALETTE.length] : '#ccc';
                     };
                 } else {
@@ -2732,7 +2737,7 @@
                                     onCreateTrip={() => setView('setup')}
                                     joinId={joinId}
                                     setJoinId={setJoinId}
-                                    onJoin={(arg) => handleLocalJoin(typeof arg === 'string' ? arg : null)}
+                                    onJoin={(arg) => handleLocalJoin(arg)}
                                     recentTrips={recentTrips}
                                     onDeleteTrip={handleDeleteTrip}
                                     isOffline={isOffline}
@@ -2899,10 +2904,10 @@
                                                                 <div key={act.id} className={`bg-[#F5FDFC] rounded-2xl border overflow-hidden ${act.transport==='expense'?'border-orange-100 bg-orange-50/30':'border-[#eeeeee]'}`}>
                                                                     <div className="flex items-stretch min-h-[2.8rem] cursor-pointer" onClick={()=>setExpandedId(isExpanded?null:act.id)}>
                                                                         <div className="w-16 flex flex-col items-center justify-center border-r border-gray-100 bg-white/50 py-1 px-1">
-                                                                            <div onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.time} onSave={v=>updateActivity(act.id,'time',v)} readOnly={!isOwner && act.createdBy !== currentMember?.name} className="font-bold text-sm text-center bg-transparent w-full outline-none p-0 text-gray-700" /></div>
+                                                                            <div onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.time} onSave={v=>updateActivity(act.id,'time',v)} readOnly={!isOwner} className="font-bold text-sm text-center bg-transparent w-full outline-none p-0 text-gray-700" /></div>
                                                                             {act.transport === 'expense' ? <div className="text-[10px] text-orange-400 flex items-center gap-1 mt-0.5"><DollarSign size={10}/>消費</div> : <div className="flex items-center justify-center gap-1 mt-0.5 w-full"></div>}
                                                                         </div>
-                                                                        <div className="flex-1 flex items-center px-4 overflow-hidden"><div className="w-full" onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner && act.createdBy !== currentMember?.name} className="font-bold text-lg bg-transparent w-full text-gray-800" /></div></div>
+                                                                        <div className="flex-1 flex items-center px-4 overflow-hidden"><div className="w-full" onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner} className="font-bold text-lg bg-transparent w-full text-gray-800" /></div></div>
                                                                         <div className="flex items-center pr-3 gap-2">
                                                                             {act.transport !== 'expense' && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={16} /></button>}
                                                                             <ChevronDown size={20} className={`text-gray-300 transition ${isExpanded?'rotate-180':''}`}/>
@@ -2910,16 +2915,16 @@
                                                                     </div>
                                                                     <div className={`transition-all ${isExpanded?'max-h-[500px]':'max-h-0'}`}>
                                                                         <div className="p-4 border-t border-gray-100 bg-[#F5FDFC] space-y-3">
-                                                                            <AutoSaveInput value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner && act.createdBy !== currentMember?.name} placeholder="備註..." className="w-full text-sm bg-[#E2E2E2] rounded-xl p-2 text-gray-700 border border-[#eeeeee]" />
+                                                                            <AutoSaveInput value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-sm bg-[#E2E2E2] rounded-xl p-2 text-gray-700 border border-[#eeeeee]" />
                                                                             {act.transport!=='expense' && <div className="grid grid-cols-2 gap-2">
-                                                                                <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner && act.createdBy !== currentMember?.name} className="text-sm bg-transparent w-full text-gray-700"/></div>
-                                                                                <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner && act.createdBy !== currentMember?.name} className="text-sm bg-transparent w-full text-gray-700"/></div>
+                                                                                <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-sm bg-transparent w-full text-gray-700"/></div>
+                                                                                <div className="bg-[#E2E2E2] p-2 rounded-xl border border-[#eeeeee]"><label className="text-[10px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-sm bg-transparent w-full text-gray-700"/></div>
                                                                             </div>}
                                                                             {act.transport==='expense' && <div className="flex gap-2 bg-orange-50 p-2 rounded-xl border border-orange-100"><div className="flex-1 text-orange-600 font-bold">${act.cost}</div><div className="flex-1">{act.currency}</div><div className="flex-1">{act.category}</div><div className="text-xs text-gray-400 self-center">{act.payer}付</div></div>}
                                                                             <div>
                                                                                 <div className="flex justify-between items-center mb-2"><label className="text-xs font-bold text-gray-400">照片</label>
                                                                                     <div className="flex gap-2">
-                                                                                        {act.transport!=='expense' && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
+                                                                                        {act.transport!=='expense' && isOwner && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
                                                                                         {act.transport==='expense' && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingExpense({...act, originalDate: selectedDate}); setModals({ ...modals, expense: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={16} /></button>}
                                                                                         {/* CRITICAL FIX: Add safe navigation operator ?. for currentMember */}
                                                                                         {(isOwner || (act.transport === 'expense' && act.createdBy === currentMember?.name)) && <button onClick={() => act.transport==='expense' ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>}
