@@ -881,9 +881,9 @@
                                     className="flex items-center justify-between cursor-pointer" 
                                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                 >
-                                    <div className="flex items-center gap-2 flex-1 min-w-0 pr-8">
+                                    <div className="flex items-center gap-1 flex-1 min-w-0 pr-8">
                                         <BedDouble size={14} className="text-gray-600 flex-shrink-0" />
-                                        <div onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center">
+                                        <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
                                             <AutoSaveInput 
                                                 type="text" 
                                                 readOnly={!isOwner} 
@@ -967,7 +967,7 @@
                                             </div>
                                         </div>
                                         
-                                        {/* Updated: Note Input Row now includes Expense fields to the right */}
+                                        {/* Note Input Row */}
                                         <div className="px-1 flex gap-2 items-center">
                                             <div className="flex-[2] min-w-0">
                                                 <AutoSaveInput 
@@ -2040,15 +2040,25 @@
             };
             
             const updateActivity = (id, field, val) => { 
-                if (!isOwner) return; 
                 const acts = [...tripData.itinerary[selectedDate]]; 
                 const idx = acts.findIndex(a=>a.id===id); 
-                if(idx>=0) { acts[idx][field]=val; updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); } 
+                if(idx>=0) {
+                    // [MODIFIED] Allow Owner OR Creator to edit
+                    const act = acts[idx];
+                    if (!isOwner && act.createdBy !== currentMember?.name) return;
+                    
+                    acts[idx][field]=val; 
+                    updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
+                } 
             };
 
             // FIX: Modified to support cross-date activity saving
             const handleSaveActivity = (data) => {
-                if (!isOwner) return; 
+                // [MODIFIED] Allow Owner OR Creator (if editing) OR Any Member (if creating)
+                if (!isOwner && editingActivity && editingActivity.createdBy !== currentMember?.name) {
+                     alert("只能修改自己建立的行程");
+                     return;
+                }
                 
                 const targetDate = data.date;
                 // For editing, if defaultValues exists, use the original date and ID
@@ -2141,7 +2151,10 @@
             };
             
             const deleteActivity = (id) => {
-                if (!isOwner) return;
+                // [MODIFIED] Allow Owner OR Creator to delete
+                const act = tripData.itinerary[selectedDate].find(a=>a.id===id);
+                if (!isOwner && act?.createdBy !== currentMember?.name) return;
+                
                 setConfirm({ open: true, msg: '確定刪除此項目？', action: () => {
                     const newActs = tripData.itinerary[selectedDate].filter(a=>a.id!==id);
                     updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: newActs});
@@ -2613,16 +2626,20 @@
 
                 if (isByMember) {
                     // Mode: By Member
-                    groupKeys = tripData.members.map(m => m.name);
+                    // [CRITICAL FIX] Ensure we don't crash on null members
+                    const validMembers = (tripData.members || []).filter(m => m && m.name);
+                    groupKeys = validMembers.map(m => m.name);
+                    
                     // Use a distinct palette for members
                     const MEMBER_PALETTE = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B6B', '#C9CBCF', '#4D5360', '#F7464A'];
                     getColor = (name) => {
-                        const idx = tripData.members.findIndex(m => m.name === name);
+                        const idx = validMembers.findIndex(m => m.name === name);
                         return idx >= 0 ? MEMBER_PALETTE[idx % MEMBER_PALETTE.length] : '#ccc';
                     };
                 } else {
                     // Mode: By Category (Default)
-                    groupKeys = tripData.expenseCategories || Object.keys(CATEGORY_COLORS);
+                    // [FIX] Create a copy to avoid mutating state
+                    groupKeys = [...(tripData.expenseCategories || Object.keys(CATEGORY_COLORS))];
                     if (!groupKeys.includes('住宿')) groupKeys.push('住宿'); // Ensure '住宿' exists
                     getColor = (cat) => CATEGORY_COLORS[cat] || '#ccc';
                 }
@@ -2790,7 +2807,7 @@
                                     onCreateTrip={() => setView('setup')}
                                     joinId={joinId}
                                     setJoinId={setJoinId}
-                                    onJoin={(arg) => handleLocalJoin(typeof arg === 'string' ? arg : null)}
+                                    onJoin={(arg) => handleLocalJoin(arg)}
                                     recentTrips={recentTrips}
                                     onDeleteTrip={handleDeleteTrip}
                                     isOffline={isOffline}
@@ -3111,9 +3128,9 @@
                                                         ) : (
                                                             expenseStatsByCurrency.map(stat => (
                                                                 <div key={stat.currency} className="space-y-4 pt-4 mt-4 border-t-2 border-dashed border-gray-200 first:border-0 first:mt-0 first:pt-0">
-                                                                    <div className="flex items-center gap-2 mb-2 mt-1 px-1">
-                                                                        <div className={`h-3 w-1 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
-                                                                        <h4 className="font-bold text-gray-500 text-sm flex-1 tracking-wide">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
+                                                                    <div className="flex items-center gap-2 px-1 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+                                                                        <div className={`h-6 w-1.5 rounded-full ${stat.currency === 'JPY' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
+                                                                        <h4 className="font-bold text-gray-800 text-lg flex-1">{stat.currency === 'JPY' ? '🇯🇵 日圓' : '🇹🇼 台幣'} 統計</h4>
                                                                     </div>
                                                                     
                                                                     <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
