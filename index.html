@@ -1526,6 +1526,10 @@
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
             const [expenseFilterPayer, setExpenseFilterPayer] = useState('all'); // 新增：付款人篩選狀態
             const [expenseFilterCurrency, setExpenseFilterCurrency] = useState('all'); // 新增：幣別篩選狀態
+            
+            // [NEW] 新增統計檢視模式狀態：'category' (依類別) 或 'member' (依成員)
+            const [expenseViewMode, setExpenseViewMode] = useState('category');
+
             const [isCreating, setIsCreating] = useState(false); 
             const [editingActivity, setEditingActivity] = useState(null);
             const [editingExpense, setEditingExpense] = useState(null); // 新增：正在編輯的記帳項目
@@ -1598,9 +1602,6 @@
                     await signInAnonymously(auth);
 
                     // --- IDENTITY MIGRATION FIX START ---
-                    // 修正：離線轉線上時的身分識別衝突
-                    // 當 Firebase 連線成功後，檢查本地資料。若發現舊的「離線隨機 ID」，
-                    // 自動將其遷移為新的「Firebase UID」，確保使用者不失去 Owner 權限。
                     const fbUser = auth.currentUser;
                     const localOfflineId = localStorage.getItem('gtp_local_uid');
 
@@ -2604,23 +2605,38 @@
                 }
 
                 const datesToShow = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
-                const currentCategories = tripData.expenseCategories || Object.keys(CATEGORY_COLORS);
+                
+                // [MODIFIED] Determine Grouping Logic based on View Mode
+                const isByMember = expenseViewMode === 'member';
+                let groupKeys = [];
+                let getColor = (k) => '#ccc';
+
+                if (isByMember) {
+                    // Mode: By Member
+                    groupKeys = tripData.members.map(m => m.name);
+                    // Use a distinct palette for members
+                    const MEMBER_PALETTE = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B6B', '#C9CBCF', '#4D5360', '#F7464A'];
+                    getColor = (name) => {
+                        const idx = tripData.members.findIndex(m => m.name === name);
+                        return idx >= 0 ? MEMBER_PALETTE[idx % MEMBER_PALETTE.length] : '#ccc';
+                    };
+                } else {
+                    // Mode: By Category (Default)
+                    groupKeys = tripData.expenseCategories || Object.keys(CATEGORY_COLORS);
+                    if (!groupKeys.includes('住宿')) groupKeys.push('住宿'); // Ensure '住宿' exists
+                    getColor = (cat) => CATEGORY_COLORS[cat] || '#ccc';
+                }
 
                 return targetCurrencies.map(currency => {
                     let totalForCurrency = 0;
-                    const catTotals = {};
-                    currentCategories.forEach(c => catTotals[c] = 0);
-                    // Add '住宿' to catTotals if not present (usually mapped to yellow)
-                    if (catTotals['住宿'] === undefined) catTotals['住宿'] = 0;
+                    const groupTotals = {};
+                    groupKeys.forEach(k => groupTotals[k] = 0);
 
                     // Calculate Bar Data (Daily Breakdown) & Accumulate Totals
                     const barData = datesToShow.map(date => {
                          const dayActs = tripData.itinerary?.[date] || [];
-                         // [NEW] Get accommodations for this day
                          const dayAccoms = tripData.accommodations?.[date] || [];
                          
-                         // Filter relevant expenses for this day, payer, and THIS specific currency loop
-                         // FIX: Added guard check (!a) to prevent crash on dirty data (null/undefined in array)
                          const relevant = dayActs.filter(a => 
                             a && 
                             (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
@@ -2629,14 +2645,29 @@
                          );
                          
                          let dayTotal = 0;
-                         const dayCatBreakdown = {};
+                         const dayBreakdown = {};
                          
+                         // Helper to process cost
+                         const addCost = (cost, catName, payerName) => {
+                             const val = parseFloat(cost) || 0;
+                             if (val <= 0) return;
+                             
+                             dayTotal += val;
+                             totalForCurrency += val;
+                             
+                             // Determine key based on mode
+                             const key = isByMember ? (payerName || '未知') : (catName || '其他');
+                             
+                             // Initialize if not present (handle ad-hoc keys)
+                             if (dayBreakdown[key] === undefined) dayBreakdown[key] = 0;
+                             if (groupTotals[key] === undefined) groupTotals[key] = 0;
+
+                             dayBreakdown[key] += val;
+                             groupTotals[key] += val;
+                         };
+
                          // 1. Process Normal Expenses
                          relevant.forEach(e => {
-                             const cost = parseFloat(e.cost) || 0;
-                             dayTotal += cost;
-                             totalForCurrency += cost;
-                             
                              let cat = e.category;
                              if (!cat) {
                                 if (e.transport === 'expense') cat = '其他';
@@ -2644,54 +2675,44 @@
                                 else if (e.title && e.title.includes('門票')) cat = '門票';
                                 else cat = '娛樂';
                              }
-                             
-                             dayCatBreakdown[cat] = (dayCatBreakdown[cat] || 0) + cost;
-                             catTotals[cat] = (catTotals[cat] || 0) + cost;
+                             addCost(e.cost, cat, e.payer);
                          });
 
-                         // 2. [NEW] Process Accommodation Expenses
-                         // 邏輯：只在 Check-in 當天計算一次，避免因住宿卡片跨日重複顯示而導致重複計算費用
+                         // 2. Process Accommodation Expenses (Check-in date only)
                          dayAccoms.forEach(acc => {
                              if (acc && acc.cost && parseFloat(acc.cost) > 0 && acc.checkInDate === date) {
                                  const accPayer = acc.payer || (tripData.members?.[0]?.name) || '我';
-                                 const accCurrency = acc.currency || 'JPY'; // default if missing
+                                 const accCurrency = acc.currency || 'JPY';
                                  
                                  // Apply filters
                                  if (expenseFilterPayer !== 'all' && accPayer !== expenseFilterPayer) return;
                                  if (accCurrency !== currency) return;
 
-                                 const cost = parseFloat(acc.cost);
-                                 dayTotal += cost;
-                                 totalForCurrency += cost;
-
-                                 const cat = '住宿';
-                                 dayCatBreakdown[cat] = (dayCatBreakdown[cat] || 0) + cost;
-                                 catTotals[cat] = (catTotals[cat] || 0) + cost;
+                                 addCost(acc.cost, '住宿', accPayer);
                              }
                          });
                          
                          // Format breakdown for SimpleBarChart
-                         const breakdown = Object.keys(dayCatBreakdown).map(cat => ({
-                             category: cat,
-                             cost: dayCatBreakdown[cat],
-                             color: CATEGORY_COLORS[cat] || '#ccc'
+                         const breakdown = Object.keys(dayBreakdown).map(k => ({
+                             category: k,
+                             cost: dayBreakdown[k],
+                             color: getColor(k)
                          }));
                          
                          return { date, total: dayTotal, breakdown };
                     });
 
                     // Format Pie Data
-                    const pieData = Object.keys(catTotals)
-                        .filter(k => catTotals[k] > 0)
+                    const pieData = Object.keys(groupTotals)
+                        .filter(k => groupTotals[k] > 0)
                         .map(k => ({ 
                             category: k, 
-                            value: catTotals[k], 
-                            color: CATEGORY_COLORS[k] || '#ccc' 
+                            value: groupTotals[k], 
+                            color: getColor(k) 
                         }))
                         .sort((a, b) => b.value - a.value); // Sort by value descending
 
-                    // Hide currency group if total is 0 AND user selected 'all' (to avoid empty charts)
-                    // But if user explicitly selected this currency, show it even if empty (0)
+                    // Hide currency group if total is 0 AND user selected 'all'
                     if (expenseFilterCurrency === 'all' && totalForCurrency === 0) return null;
 
                     return {
@@ -2701,7 +2722,7 @@
                         barData
                     };
                 }).filter(Boolean); // Remove nulls
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]);
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode]); // Added expenseViewMode dependency
 
             const sortedExpensesByDate = useMemo(() => {
                 if (!tripData) return [];
