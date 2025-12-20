@@ -684,77 +684,6 @@
             );
         };
 
-        const JoinModal = ({ isOpen, onClose, tripData, onJoin }) => {
-            const [mode, setMode] = useState('new'); 
-            const [name, setName] = useState('');
-            const [pin, setPin] = useState('');
-            const [error, setError] = useState('');
-
-            if (!isOpen || !tripData) return null;
-
-            const handleJoin = () => {
-                setError('');
-                if (!pin.trim()) { setError('請輸入 PIN 碼'); return; }
-                
-                if (mode === 'new') {
-                    if (!name.trim()) { setError('請輸入您的暱稱'); return; }
-                    if (tripData.members.some(m => m.name === name.trim())) { setError('此暱稱已被使用，請更換'); return; }
-                    onJoin({ name: name.trim(), pin: pin.trim(), role: 'collaborator', isNew: true });
-                } else {
-                    if (!name) { setError('請選擇您的身分'); return; }
-                    const member = tripData.members.find(m => m.name === name);
-                    if (!member) { setError('找不到成員資料'); return; }
-                    if (member.pin !== pin.trim()) { setError('PIN 碼錯誤'); return; }
-                    onJoin({ name: member.name, pin: member.pin, role: member.role, isNew: false });
-                }
-            };
-
-            return (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
-                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-                    <div className="bg-[#F5FDFC] w-full max-w-sm rounded-2xl p-6 border border-[#eeeeee] shadow-2xl relative z-10 flex flex-col">
-                        <h3 className="text-xl font-bold text-[#0ABAB5] mb-4 text-center">加入旅程</h3>
-                        <div className="flex bg-gray-200 p-1 rounded-xl mb-4">
-                            <button onClick={() => setMode('new')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'new' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>我是新協作者</button>
-                            <button onClick={() => setMode('old')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'old' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>我是舊成員</button>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            {mode === 'new' ? (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 block mb-1">您的暱稱</label>
-                                    <input value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]" placeholder="例如：小明" />
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 block mb-1">選擇您的身分</label>
-                                    <select value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]">
-                                        <option value="">-- 請選擇 --</option>
-                                        {tripData.members.map(m => {
-                                            // FIX: Guard clause
-                                            if (!m) return null;
-                                            return <option key={m.name} value={m.name}>{m.name}</option>;
-                                        })}
-                                    </select>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 block mb-1">{mode === 'new' ? '設定您的 PIN 碼' : '輸入 PIN 碼驗證'}</label>
-                                <input type="password" value={pin} onChange={e => setPin(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]" placeholder="****" />
-                            </div>
-                        </div>
-
-                        {error && <p className="text-red-500 text-xs font-bold mt-3 text-center">{error}</p>}
-
-                        <button onClick={handleJoin} className="w-full py-3 bg-[#0ABAB5] text-white rounded-xl font-bold border border-[#0ABAB5] hover:bg-[#008985] transition-all mt-6">
-                            {mode === 'new' ? '加入並開始' : '驗證並登入'}
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
         const AutoSaveInput = ({ value, onSave, readOnly, ...props }) => {
             const [v, setV] = useState(value ?? '');
             useEffect(() => setV(value ?? ''), [value]);
@@ -1056,17 +985,6 @@
                 </div>
             );
         };
-
-        const FlightCard = ({ label, icon: Icon, data, onUpdate, isOwner }) => (
-            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-2 mb-2 relative border border-[#eeeeee]">
-                <div className="absolute top-0 right-0 bg-[#3B82F6] text-white text-[10px] px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold">{label}</div>
-                <div className="flex items-center justify-between mt-3">
-                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 placeholder-gray-300" /></div>
-                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-0.5 transform rotate-45"><Icon size={20} /></div><div className="w-full flex items-center justify-center relative mb-0.5"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-xs font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
-                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 text-right placeholder-gray-300" /></div>
-                </div>
-            </div>
-        );
 
         const EditTripModal = ({ isOpen, onClose, tripData, onSave }) => {
             const [formData, setFormData] = useState({});
@@ -1738,7 +1656,8 @@
                             inbound: (d.flights && d.flights.inbound) || {}
                         },
                         expenseCategories: Array.isArray(d.expenseCategories) ? d.expenseCategories : Object.keys(CATEGORY_COLORS),
-                        members: Array.isArray(d.members) ? d.members : []
+                        // [FIX] Filter out null/invalid members to prevent crash in statistics
+                        members: Array.isArray(d.members) ? d.members.filter(m => m && m.name) : []
                     };
 
                     // 2. 深度清洗 itinerary (行程)
