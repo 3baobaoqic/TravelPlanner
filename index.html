@@ -2040,25 +2040,15 @@
             };
             
             const updateActivity = (id, field, val) => { 
+                if (!isOwner) return; 
                 const acts = [...tripData.itinerary[selectedDate]]; 
                 const idx = acts.findIndex(a=>a.id===id); 
-                if(idx>=0) {
-                    // [MODIFIED] Allow Owner OR Creator to edit
-                    const act = acts[idx];
-                    if (!isOwner && act.createdBy !== currentMember?.name) return;
-                    
-                    acts[idx][field]=val; 
-                    updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
-                } 
+                if(idx>=0) { acts[idx][field]=val; updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); } 
             };
 
             // FIX: Modified to support cross-date activity saving
             const handleSaveActivity = (data) => {
-                // [MODIFIED] Allow Owner OR Creator (if editing) OR Any Member (if creating)
-                if (!isOwner && editingActivity && editingActivity.createdBy !== currentMember?.name) {
-                     alert("只能修改自己建立的行程");
-                     return;
-                }
+                if (!isOwner) return; 
                 
                 const targetDate = data.date;
                 // For editing, if defaultValues exists, use the original date and ID
@@ -2151,10 +2141,7 @@
             };
             
             const deleteActivity = (id) => {
-                // [MODIFIED] Allow Owner OR Creator to delete
-                const act = tripData.itinerary[selectedDate].find(a=>a.id===id);
-                if (!isOwner && act?.createdBy !== currentMember?.name) return;
-                
+                if (!isOwner) return;
                 setConfirm({ open: true, msg: '確定刪除此項目？', action: () => {
                     const newActs = tripData.itinerary[selectedDate].filter(a=>a.id!==id);
                     updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: newActs});
@@ -2162,6 +2149,18 @@
             };
 
             const deleteTransaction = (id, date, item) => {
+                // [FIX] Support deleting accommodations from expense list
+                if (item.isAccommodation) {
+                     if (!isOwner) { alert("只有主辦人可以刪除住宿"); return; }
+                     setConfirm({ open: true, msg: '確定刪除此住宿？', action: () => {
+                         let currentList = tripData.accommodations?.[date] || [];
+                         if (!Array.isArray(currentList)) currentList = [currentList];
+                         const newList = currentList.filter(acc => acc.id !== id);
+                         updateTrip('accommodations', { ...tripData.accommodations, [date]: newList });
+                     }});
+                     return;
+                }
+
                 // CRITICAL FIX: Ensure currentMember exists before accessing name
                 if (!isOwner && item.createdBy !== currentMember?.name) { alert("只能刪除自己建立的記帳"); return; }
                 setConfirm({ open: true, msg: '確定刪除此交易？', action: () => {
@@ -2776,7 +2775,7 @@
                     if (combinedItems.length > 0) { expenseList.push({ date, items: combinedItems }); }
                 });
                 return expenseList;
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, isOwner, currentMember]); // [FIX] Added isOwner and currentMember dependency
 
             const sortedActivities = useMemo(() => {
                 const acts = tripData?.itinerary?.[selectedDate] || [];
@@ -3183,9 +3182,12 @@
                                                                             </div>
                                                                             <div className="space-y-2">
                                                                                 {items.map(e => {
-                                                                                    // [FIX] 統一權限判斷：擁有者 或 該筆記帳建立者 才有權限
-                                                                                    // 排除住宿項目 (因為住宿在行程頁管理)
-                                                                                    const canEdit = !e.isAccommodation && (isOwner || e.createdBy === currentMember?.name);
+                                                                                    const isCreator = e.createdBy === currentMember?.name;
+                                                                                    // [FIX] 擁有者權限解鎖：
+                                                                                    // 1. 刪除：擁有者可刪除一切 (含住宿)，協作者只能刪自己的
+                                                                                    // 2. 住宿項目 (isAccommodation) 只能被刪除，不能在此編輯 (需去行程頁)
+                                                                                    const canDelete = isOwner || (!e.isAccommodation && isCreator);
+                                                                                    const canEdit = !e.isAccommodation && (isOwner || isCreator);
                                                                                     
                                                                                     return (
                                                                                     <div key={e.id} onClick={() => !e.isAccommodation && setModals({...modals, transaction:e})} className={`flex justify-between items-center bg-[#EDF7F6] p-2.5 rounded-lg border border-[#E0F2F1] ${!e.isAccommodation ? 'active:scale-[0.99] transition-transform cursor-pointer' : ''}`}>
@@ -3215,7 +3217,7 @@
                                                                                             )}
                                                                                             
                                                                                             {/* Delete Button */}
-                                                                                            {canEdit && (
+                                                                                            {canDelete && (
                                                                                                 <button 
                                                                                                     onClick={(evt) => { 
                                                                                                         evt.stopPropagation(); 
@@ -3239,54 +3241,3 @@
                                                     </div>
                                                 )}
                                             </div>
-
-                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} selectedDate={selectedDate} onUpdateCategories={c=>updateTrip('expenseCategories',c)} />
-                                            <ExpenseModal 
-                                                isOpen={modals.expense} 
-                                                onClose={()=> { setModals({...modals, expense:false}); setEditingExpense(null); }} 
-                                                tripData={tripData} 
-                                                onSave={handleSaveExpense} 
-                                                onUpdateCategories={c=>updateTrip('expenseCategories',c)} 
-                                                selectedDate={selectedDate} 
-                                                currentMember={currentMember}
-                                                defaultValues={editingExpense}
-                                            />
-                                            {modals.transaction && (
-                                                <TransactionDetailModal 
-                                                    transaction={modals.transaction} 
-                                                    onClose={() => setModals({ ...modals, transaction: null })} 
-                                                    onViewImage={(url) => setModals({ ...modals, viewingImage: url })} 
-                                                />
-                                            )}
-                                            <ImageModal src={modals.viewingImage} onClose={()=>setModals({...modals, viewingImage:null})} />
-                                            {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
-                                            <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
-                                            <MemberManagementModal 
-                                                isOpen={modals.members} 
-                                                onClose={() => setModals({ ...modals, members: false })} 
-                                                tripData={tripData} 
-                                                currentMember={currentMember} 
-                                                onUpdateMember={handleUpdateMember} 
-                                                onRemoveMember={handleRemoveMember}
-                                                onAddMember={handleAddMember}
-                                            />
-                                            <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
-                                        </>
-                                        )
-                                    )}
-                                </>
-                            )}
-                            
-                            {/* GLOBAL MODALS */}
-                            <ConfirmModal isOpen={confirm.open} message={confirm.msg} onConfirm={()=>{confirm.action(); setConfirm({open:false})}} onCancel={()=>setConfirm({open:false})} />
-                        </>
-                    )}
-                </div>
-            );
-        };
-
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
