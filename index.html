@@ -712,6 +712,7 @@
             );
         };
 
+// 這是遺失的 JoinModal 元件，請貼在 MemberManagementModal 之後
         const JoinModal = ({ isOpen, onClose, tripData, onJoin }) => {
             const [mode, setMode] = useState('new'); 
             const [name, setName] = useState('');
@@ -759,7 +760,6 @@
                                     <select value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]">
                                         <option value="">-- 請選擇 --</option>
                                         {tripData.members.map(m => {
-                                            // FIX: Guard clause
                                             if (!m) return null;
                                             return <option key={m.name} value={m.name}>{m.name}</option>;
                                         })}
