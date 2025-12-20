@@ -986,6 +986,17 @@
             );
         };
 
+        const FlightCard = ({ label, icon: Icon, data, onUpdate, isOwner }) => (
+            <div className="bg-[#EFF6FF] border-l-4 border-[#3B82F6] shadow-sm rounded-xl p-2 mb-2 relative border border-[#eeeeee]">
+                <div className="absolute top-0 right-0 bg-[#3B82F6] text-white text-[10px] px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold">{label}</div>
+                <div className="flex items-center justify-between mt-3">
+                    <div className="flex flex-col items-start w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">起飛</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.depTime} placeholder="14:00" maxLength={5} onSave={(val) => onUpdate('depTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.depAirport} onSave={(val) => onUpdate('depAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 placeholder-gray-300" /></div>
+                    <div className="flex flex-col items-center justify-center w-1/3 px-2"><div className="text-[#3B82F6] mb-0.5 transform rotate-45"><Icon size={20} /></div><div className="w-full flex items-center justify-center relative mb-0.5"><div className="h-px bg-gray-300 w-full absolute top-1/2 left-0"></div><div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full z-10"></div></div><AutoSaveInput type="text" readOnly={!isOwner} placeholder="航班號" value={data.number} onSave={(val) => onUpdate('number', val)} className="text-center text-xs font-bold text-[#1E40AF] bg-transparent outline-none w-full placeholder-gray-300 uppercase" /></div>
+                    <div className="flex flex-col items-end w-1/3"><label className="text-[10px] text-gray-400 font-medium mb-0.5">抵達</label><AutoSaveInput type="text" readOnly={!isOwner} value={data.arrTime} placeholder="18:30" maxLength={5} onSave={(val) => onUpdate('arrTime', val)} className="text-lg font-bold text-gray-700 bg-transparent outline-none w-full p-0 leading-none text-right" /><AutoSaveInput type="text" readOnly={!isOwner} placeholder="機場/航廈" value={data.arrAirport} onSave={(val) => onUpdate('arrAirport', val)} className="text-xs text-gray-500 font-medium bg-transparent outline-none w-full mt-0.5 text-right placeholder-gray-300" /></div>
+                </div>
+            </div>
+        );
+
         const EditTripModal = ({ isOpen, onClose, tripData, onSave }) => {
             const [formData, setFormData] = useState({});
             useEffect(() => {
@@ -1646,7 +1657,7 @@
                 // [CRITICAL FIX] 強化資料處理函式：深度清洗與型別矯正 (Deep Cleaning)
                 // 確保 members, expenseCategories 以及 itinerary/accommodations 內的每一天資料絕對是陣列
                 const processLoadedData = (d) => {
-                    if (!d) return null;
+                    if (!d || typeof d !== 'object') return null;
                     
                     // 1. 基礎結構與外層陣列檢查
                     let cleanData = {
@@ -1718,32 +1729,36 @@
                         try {
                             const rawData = JSON.parse(localData);
                             const d = processLoadedData(rawData); // 使用強化版的處理函式
-                            setTripData(d);
                             
-                            // Fix: Check ref instead of stale state variable to prevent unwanted reset
-                            if(!selectedDateRef.current) setSelectedDate(d.startDate);
-                            
-                            // [FIX] 離線模式嚴格身分檢查
-                            const found = d.members.find(m => m.deviceId === userId);
-                            
-                            if (found) {
-                                setCurrentMember(found);
-                                if(view === 'landing' || view === 'setup') {
-                                     setView('planner');
-                                     setSelectedDate(d.startDate);
+                            // [FIX] Check if data is valid before proceeding
+                            if (d) { 
+                                setTripData(d);
+                                
+                                // Fix: Check ref instead of stale state variable to prevent unwanted reset
+                                if(!selectedDateRef.current) setSelectedDate(d.startDate);
+                                
+                                // [FIX] 離線模式嚴格身分檢查
+                                const found = d.members.find(m => m.deviceId === userId);
+                                
+                                if (found) {
+                                    setCurrentMember(found);
+                                    if(view === 'landing' || view === 'setup') {
+                                         setView('planner');
+                                         setSelectedDate(d.startDate);
+                                    }
+                                } else {
+                                    // 找不到身分時：強制清空並彈出加入視窗 (移除原本的自動指派 owner 邏輯)
+                                    setCurrentMember(null);
+                                    setModals(m => ({...m, join: true}));
                                 }
-                            } else {
-                                // 找不到身分時：強制清空並彈出加入視窗 (移除原本的自動指派 owner 邏輯)
-                                setCurrentMember(null);
-                                setModals(m => ({...m, join: true}));
-                            }
 
-                            // Update recent trips
-                            setRecentTrips(p => { 
-                                const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
-                                localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
-                                return newRecents; 
-                            });
+                                // Update recent trips
+                                setRecentTrips(p => { 
+                                    const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
+                                    localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
+                                    return newRecents; 
+                                });
+                            }
                         } catch (e) {
                             console.error("Error loading local data", e);
                             alert("讀取本機資料時發生錯誤");
@@ -1764,33 +1779,36 @@
                         async (s) => {
                             if(s.exists()) {
                                 const d = processLoadedData(s.data()); // 使用強化版的處理函式
-                                setTripData(d);
                                 
-                                if(!selectedDateRef.current) setSelectedDate(d.startDate);
-                                
-                                const currentAuthUser = getAuth(apps[0]).currentUser;
-                                if(currentAuthUser) {
-                                    // [FIX] 線上模式嚴格身分檢查
-                                    const found = d.members.find(m => m.deviceId === currentAuthUser.uid);
-                                    if (found) {
-                                        setCurrentMember(found);
-                                        if(view === 'landing' || view === 'setup') {
-                                            setView('planner');
-                                            setSelectedDate(d.startDate);
+                                if (d) {
+                                    setTripData(d);
+                                    
+                                    if(!selectedDateRef.current) setSelectedDate(d.startDate);
+                                    
+                                    const currentAuthUser = getAuth(apps[0]).currentUser;
+                                    if(currentAuthUser) {
+                                        // [FIX] 線上模式嚴格身分檢查
+                                        const found = d.members.find(m => m.deviceId === currentAuthUser.uid);
+                                        if (found) {
+                                            setCurrentMember(found);
+                                            if(view === 'landing' || view === 'setup') {
+                                                setView('planner');
+                                                setSelectedDate(d.startDate);
+                                            }
+                                            // 確保如果是已驗證成員，加入視窗是關閉的
+                                            setModals(m => ({...m, join: false}));
+                                        } else {
+                                            // 找不到身分時：強制清空並彈出加入視窗
+                                            setCurrentMember(null);
+                                            setModals(m => ({...m, join: true}));
                                         }
-                                        // 確保如果是已驗證成員，加入視窗是關閉的
-                                        setModals(m => ({...m, join: false}));
-                                    } else {
-                                        // 找不到身分時：強制清空並彈出加入視窗
-                                        setCurrentMember(null);
-                                        setModals(m => ({...m, join: true}));
                                     }
+                                    setRecentTrips(p => { 
+                                        const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
+                                        localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
+                                        return newRecents; 
+                                    });
                                 }
-                                setRecentTrips(p => { 
-                                    const newRecents = [{id: d.id, destination: d.destination, dateRange: `${d.startDate.slice(5)} - ${d.endDate.slice(5)}`}, ...p.filter(t=>t.id!==d.id)].slice(0,5); 
-                                    localStorage.setItem('gtp_recent_trips', JSON.stringify(newRecents)); 
-                                    return newRecents; 
-                                });
                             } else {
                                 // --- AUTO UPLOAD LOGIC ---
                                 const localData = localStorage.getItem(`gtp_trip_${tripId}`);
@@ -1799,7 +1817,9 @@
                                             console.log("Auto-uploading local data to Firebase...");
                                             // Process data before upload to ensure integrity
                                             const cleanData = processLoadedData(JSON.parse(localData));
-                                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(cleanData));
+                                            if (cleanData) {
+                                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), sanitizeFirestoreData(cleanData));
+                                            }
                                     } catch (e) {
                                             console.error("Auto-upload failed", e);
                                     }
@@ -2016,15 +2036,25 @@
             };
             
             const updateActivity = (id, field, val) => { 
-                if (!isOwner) return; 
                 const acts = [...tripData.itinerary[selectedDate]]; 
                 const idx = acts.findIndex(a=>a.id===id); 
-                if(idx>=0) { acts[idx][field]=val; updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); } 
+                if(idx>=0) {
+                    // [MODIFIED] Allow Owner OR Creator to edit
+                    const act = acts[idx];
+                    if (!isOwner && act.createdBy !== currentMember?.name) return;
+                    
+                    acts[idx][field]=val; 
+                    updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: acts}); 
+                } 
             };
 
             // FIX: Modified to support cross-date activity saving
             const handleSaveActivity = (data) => {
-                if (!isOwner) return; 
+                // [MODIFIED] Allow Owner OR Creator (if editing) OR Any Member (if creating)
+                if (!isOwner && editingActivity && editingActivity.createdBy !== currentMember?.name) {
+                     alert("只能修改自己建立的行程");
+                     return;
+                }
                 
                 const targetDate = data.date;
                 // For editing, if defaultValues exists, use the original date and ID
@@ -2117,7 +2147,10 @@
             };
             
             const deleteActivity = (id) => {
-                if (!isOwner) return;
+                // [MODIFIED] Allow Owner OR Creator to delete
+                const act = tripData.itinerary[selectedDate].find(a=>a.id===id);
+                if (!isOwner && act?.createdBy !== currentMember?.name) return;
+                
                 setConfirm({ open: true, msg: '確定刪除此項目？', action: () => {
                     const newActs = tripData.itinerary[selectedDate].filter(a=>a.id!==id);
                     updateTrip('itinerary', {...tripData.itinerary, [selectedDate]: newActs});
@@ -3217,3 +3250,54 @@
                                                     </div>
                                                 )}
                                             </div>
+
+                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} selectedDate={selectedDate} onUpdateCategories={c=>updateTrip('expenseCategories',c)} />
+                                            <ExpenseModal 
+                                                isOpen={modals.expense} 
+                                                onClose={()=> { setModals({...modals, expense:false}); setEditingExpense(null); }} 
+                                                tripData={tripData} 
+                                                onSave={handleSaveExpense} 
+                                                onUpdateCategories={c=>updateTrip('expenseCategories',c)} 
+                                                selectedDate={selectedDate} 
+                                                currentMember={currentMember}
+                                                defaultValues={editingExpense}
+                                            />
+                                            {modals.transaction && (
+                                                <TransactionDetailModal 
+                                                    transaction={modals.transaction} 
+                                                    onClose={() => setModals({ ...modals, transaction: null })} 
+                                                    onViewImage={(url) => setModals({ ...modals, viewingImage: url })} 
+                                                />
+                                            )}
+                                            <ImageModal src={modals.viewingImage} onClose={()=>setModals({...modals, viewingImage:null})} />
+                                            {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
+                                            <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
+                                            <MemberManagementModal 
+                                                isOpen={modals.members} 
+                                                onClose={() => setModals({ ...modals, members: false })} 
+                                                tripData={tripData} 
+                                                currentMember={currentMember} 
+                                                onUpdateMember={handleUpdateMember} 
+                                                onRemoveMember={handleRemoveMember}
+                                                onAddMember={handleAddMember}
+                                            />
+                                            <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
+                                        </>
+                                        )
+                                    )}
+                                </>
+                            )}
+                            
+                            {/* GLOBAL MODALS */}
+                            <ConfirmModal isOpen={confirm.open} message={confirm.msg} onConfirm={()=>{confirm.action(); setConfirm({open:false})}} onCancel={()=>setConfirm({open:false})} />
+                        </>
+                    )}
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
