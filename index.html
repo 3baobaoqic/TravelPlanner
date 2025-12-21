@@ -3136,7 +3136,11 @@
                                                                                     // FIX: Guard clause for dirty data (null photos)
                                                                                     if (!p) return null;
                                                                                     const url = typeof p === 'string' ? p : p.url; 
-                                                                                    return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember?.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}<button onClick={()=>{setUploadTarget({type:'activity', id:act.id}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={14}/></button></div>
+                                                                                    {/* CRITICAL FIX: Add safe navigation operator ?. for currentMember */}
+                                                                                    return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember?.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}
+                                                                                    {/* [FIX] 傳入 data: act，確保上傳時能讀取舊照片而不覆蓋 */}
+                                                                                    <button onClick={()=>{setUploadTarget({type:'activity', id:act.id, data: act}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={14}/></button>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -3147,13 +3151,19 @@
                                                             date={selectedDate} 
                                                             data={Array.isArray(tripData.accommodations?.[selectedDate]) ? tripData.accommodations[selectedDate] : (tripData.accommodations?.[selectedDate] ? [tripData.accommodations[selectedDate]] : [])} 
                                                             onUpdate={handleUpdateAccommodation} 
-                                                            onPhotoUpload={(id) => { setUploadTarget({type: 'accom', id: id}); fileRef.current?.click(); }} 
+                                                            // [FIX] 上傳時先查找該住宿的完整資料 (itemData) 並傳入，避免覆蓋舊照片
+                                                            onPhotoUpload={(id) => { 
+                                                                const currentList = Array.isArray(tripData.accommodations?.[selectedDate]) ? tripData.accommodations[selectedDate] : [];
+                                                                const itemData = currentList.find(i => i.id === id);
+                                                                setUploadTarget({type: 'accom', id: id, data: itemData}); 
+                                                                fileRef.current?.click(); 
+                                                            }} 
                                                             onPhotoDelete={handlePhotoDelete} 
                                                             onViewImage={(u)=>setModals({...modals, viewingImage:u})} 
                                                             onAdd={handleAddAccommodation} 
                                                             onDelete={handleDeleteAccommodation} 
                                                             isOwner={isOwner} 
-                                                            currentMember={currentMember}
+                                                            currentMember={currentMember} 
                                                             members={tripData.members}
                                                         />
                                                         
