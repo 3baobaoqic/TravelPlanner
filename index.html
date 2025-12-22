@@ -2217,23 +2217,24 @@
                 updateTrip('members', newMembers);
             };
 
+            // [FIX] 修正：旅程設定變更時，若修改了貨幣，自動同步更新所有舊資料的幣別 (溯及既往)
             const handleEditTripSave = (newData) => {
                 if(!isOwner) return;
-                const updatedTrip = { ...tripData, ...newData };
                 
-                // Check if date range changed
+                let updatedItinerary = { ...tripData.itinerary };
+                let updatedAccommodations = { ...tripData.accommodations };
+                let shouldResetDate = false;
+                let newStartDate = newData.startDate;
+
+                // 1. 處理日期變更 (Handle Date Change)
                 if (newData.startDate !== tripData.startDate || newData.endDate !== tripData.endDate) {
                      const newDates = getDatesArray(newData.startDate, newData.endDate);
-                     
-                     // FIX: 1. Prevent orphaned data by rebuilding objects based ONLY on the new date range
                      const cleanItinerary = {};
                      const cleanAccoms = {};
                      
                      newDates.forEach(d => { 
-                         // Keep existing data if within new range, otherwise initialize empty
+                         // 保留新日期範圍內的舊資料，範圍外則初始化
                          cleanItinerary[d] = tripData.itinerary[d] || []; 
-                         
-                         // Keep existing accoms if within new range, otherwise initialize default
                          cleanAccoms[d] = tripData.accommodations[d] || [{ 
                              id: generateId(), 
                              name: '', 
@@ -2247,15 +2248,59 @@
                          }]; 
                      });
                      
-                     updatedTrip.itinerary = cleanItinerary; 
-                     updatedTrip.accommodations = cleanAccoms; 
+                     updatedItinerary = cleanItinerary;
+                     updatedAccommodations = cleanAccoms;
                      
-                     // Smart redirect: Only change date if current selection is invalid
+                     // 若當前選取日期在新範圍外，重置為第一天
                      if (!newDates.includes(selectedDate)) {
-                         setSelectedDate(newDates[0]); 
+                         shouldResetDate = true;
+                         newStartDate = newDates[0];
                      }
                 }
-                updateTripFull(updatedTrip); 
+
+                // 2. 處理貨幣變更 (Handle Currency Change - Retroactive)
+                if (newData.currency !== tripData.currency) {
+                    const newCurrency = newData.currency;
+                    
+                    // 更新所有行程與記帳的幣別
+                    Object.keys(updatedItinerary).forEach(date => {
+                        if (Array.isArray(updatedItinerary[date])) {
+                            updatedItinerary[date] = updatedItinerary[date].map(act => {
+                                // 若是消費項目或有填寫費用的行程，更新幣別
+                                if (act && (act.transport === 'expense' || (act.cost && parseFloat(act.cost) > 0))) {
+                                    return { ...act, currency: newCurrency };
+                                }
+                                return act;
+                            });
+                        }
+                    });
+
+                    // 更新所有住宿的幣別
+                    Object.keys(updatedAccommodations).forEach(date => {
+                        if (Array.isArray(updatedAccommodations[date])) {
+                            updatedAccommodations[date] = updatedAccommodations[date].map(acc => {
+                                if (acc) {
+                                    return { ...acc, currency: newCurrency };
+                                }
+                                return acc;
+                            });
+                        }
+                    });
+                }
+
+                // 3. 組合最終資料並儲存
+                const updatedTrip = { 
+                    ...tripData, 
+                    ...newData, 
+                    itinerary: updatedItinerary, 
+                    accommodations: updatedAccommodations 
+                };
+                
+                updateTripFull(updatedTrip);
+                
+                if (shouldResetDate) {
+                    setSelectedDate(newStartDate);
+                }
             };
             
             const updateActivity = (id, field, val) => { 
@@ -2632,7 +2677,43 @@
             };
 
             const handleAddAccommodation = () => { if(!isOwner) return; let currentList = tripData.accommodations[selectedDate] || []; if (!Array.isArray(currentList)) currentList = [currentList]; const newList = [...currentList, { id: generateId(), name: '', bookingCode: '', checkInTime: '', checkOutDate: '', checkOutTime: '', phone: '', address: '', photoUrls: [] }]; updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList }); };
-            const handleDeleteAccommodation = (id) => { if(!isOwner) return; setConfirm({ open: true, msg: '確定刪除?', action: () => { let currentList = tripData.accommodations[selectedDate]; if (!Array.isArray(currentList)) currentList = [currentList]; const newList = currentList.filter(item => item.id !== id); updateTrip('accommodations', { ...tripData.accommodations, [selectedDate]: newList }); }}); };
+            
+            // [FIX] 修正住宿刪除邏輯：刪除時偵測是否為連續住宿，並給予對應提示
+            const handleDeleteAccommodation = (id) => { 
+                if(!isOwner) return; 
+
+                // 1. 計算此住宿 ID 出現在幾天中
+                let dayCount = 0;
+                if (tripData.accommodations) {
+                    Object.values(tripData.accommodations).forEach(list => {
+                        if (Array.isArray(list) && list.some(item => item.id === id)) {
+                            dayCount++;
+                        }
+                    });
+                }
+
+                // 2. 根據天數決定提示訊息
+                const msg = dayCount > 1 
+                    ? `⚠️ 偵測到此為連續住宿 (${dayCount} 晚)\n\n刪除此項目將會「一併移除」所有日期的住宿紀錄。\n\n確定要刪除嗎？` 
+                    : '確定刪除此住宿？';
+
+                setConfirm({ 
+                    open: true, 
+                    msg: msg, 
+                    action: () => { 
+                        const newAccommodations = { ...tripData.accommodations };
+                        
+                        // 遍歷所有日期，移除 ID 匹配的住宿項目
+                        Object.keys(newAccommodations).forEach(date => {
+                            if (Array.isArray(newAccommodations[date])) {
+                                newAccommodations[date] = newAccommodations[date].filter(item => item.id !== id);
+                            }
+                        });
+                        
+                        updateTrip('accommodations', newAccommodations); 
+                    }
+                }); 
+            };
             
             const handlePhotoUpload = async (e) => {
                 const f = e.target.files[0];
