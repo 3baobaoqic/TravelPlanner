@@ -912,7 +912,8 @@
                                 >
                                     <div className="flex items-center gap-1 flex-1 min-w-0 pr-8">
                                         <BedDouble size={14} className="text-gray-600 flex-shrink-0" />
-                                        <div onClick={(e) => e.stopPropagation()} className="w-[80%]">
+                                        {/* [MODIFIED] 修改容器樣式：使用 flex-1 和 flex items-center 確保垂直置中 */}
+                                        <div onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center">
                                             <AutoSaveInput 
                                                 type="text" 
                                                 readOnly={!isOwner} 
@@ -3099,49 +3100,45 @@
                                                         <div className="space-y-2">
                                                             {sortedActivities.map(act => {
                                                                 const isExpanded = expandedId === act.id;
+                                                                // [MODIFIED] 判斷是否為消費項目，用於設定底色
+                                                                const isExpense = act.transport === 'expense';
                                                                 return (
-                                                                // [MODIFIED] 根據是否為記帳項目 (transport==='expense') 設定不同的底色與邊框
-                                                                // 消費項目：bg-[#FFF5F2] (淺粉膚色，呼應 #D68C68), border-[#E6CEC5]
-                                                                // 一般行程：bg-[#F5FDFC] (原本的淺藍白), border-[#eeeeee]
-                                                                <div key={act.id} className={`rounded-xl border overflow-hidden ${act.transport==='expense' ? 'bg-[#FFF5F2] border-[#E6CEC5]' : 'bg-[#F5FDFC] border-[#eeeeee]'}`}>
+                                                                <div key={act.id} className={`rounded-xl border overflow-hidden ${isExpense ? 'bg-[#FFF5F2] border-[#E6CEC5]' : 'bg-[#F5FDFC] border-[#eeeeee]'}`}>
                                                                     {/* [MODIFIED] 高度縮減為 2.2rem */}
                                                                     <div className="flex items-stretch min-h-[2.2rem] cursor-pointer" onClick={()=>setExpandedId(isExpanded?null:act.id)}>
-                                                                        {/* [MODIFIED] 時間欄寬度縮減為 w-14 */}
+                                                                        {/* [MODIFIED] 左側寬度與內距調整 */}
                                                                         <div className="w-14 flex flex-col items-center justify-center border-r border-gray-100 bg-white/50 py-0.5 px-0.5">
-                                                                            {/* [MODIFIED] 時間字體縮小為 text-xs */}
                                                                             <div onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.time} onSave={v=>updateActivity(act.id,'time',v)} readOnly={!isOwner} className="font-bold text-xs text-center bg-transparent w-full outline-none p-0 text-gray-700 leading-none" /></div>
-                                                                            {act.transport === 'expense' ? <div className="text-[9px] text-orange-400 flex items-center gap-0.5 mt-0"><DollarSign size={9}/>消費</div> : <div className="flex items-center justify-center gap-0.5 mt-0 w-full"></div>}
+                                                                            {/* [MODIFIED] 移除 "消費" 文字，僅保留 icon */}
+                                                                            {isExpense ? <div className="text-[10px] text-orange-400 flex items-center gap-0.5 mt-0"><DollarSign size={9}/></div> : <div className="flex items-center justify-center gap-0.5 mt-0 w-full"></div>}
                                                                         </div>
-                                                                        {/* [MODIFIED] 標題字體縮小為 text-sm，內距縮小 */}
                                                                         <div className="flex-1 flex items-center px-2 overflow-hidden"><div className="w-full" onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner} className="font-bold text-sm bg-transparent w-full text-gray-800 leading-tight" /></div></div>
                                                                         <div className="flex items-center pr-2 gap-1">
-                                                                            {act.transport !== 'expense' && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={12} /></button>}
-                                                                            <ChevronDown size={16} className={`text-gray-300 transition ${isExpanded?'rotate-180':''}`}/>
+                                                                            {!isExpense && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={12} /></button>}
+                                                                            <ChevronDown size={14} className={`text-gray-300 transition ${isExpanded?'rotate-180':''}`}/>
                                                                         </div>
                                                                     </div>
                                                                     <div className={`transition-all ${isExpanded?'max-h-[500px]':'max-h-0'}`}>
                                                                         <div className="p-3 border-t border-gray-100 bg-[#F5FDFC] space-y-2">
                                                                             <AutoSaveInput value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-xs bg-[#E2E2E2] rounded-lg p-2 text-gray-700 border border-[#eeeeee]" />
-                                                                            {act.transport!=='expense' && <div className="grid grid-cols-2 gap-2">
+                                                                            {!isExpense && <div className="grid grid-cols-2 gap-2">
                                                                                 <div className="bg-[#E2E2E2] p-1.5 rounded-lg border border-[#eeeeee]"><label className="text-[9px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700"/></div>
                                                                                 <div className="bg-[#E2E2E2] p-1.5 rounded-lg border border-[#eeeeee]"><label className="text-[9px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700"/></div>
                                                                             </div>}
-                                                                            {act.transport==='expense' && <div className="flex gap-2 bg-orange-50 p-2 rounded-lg border border-orange-100 text-xs"><div className="flex-1 text-orange-600 font-bold">${act.cost}</div><div className="flex-1">{act.currency}</div><div className="flex-1">{act.category}</div><div className="text-[10px] text-gray-400 self-center">{act.payer}付</div></div>}
+                                                                            {isExpense && <div className="flex gap-2 bg-orange-50 p-2 rounded-lg border border-orange-100 text-xs"><div className="flex-1 text-orange-600 font-bold">${act.cost}</div><div className="flex-1">{act.currency}</div><div className="flex-1">{act.category}</div><div className="text-[10px] text-gray-400 self-center">{act.payer}付</div></div>}
                                                                             <div>
                                                                                 <div className="flex justify-between items-center mb-1"><label className="text-[10px] font-bold text-gray-400">照片</label>
                                                                                     <div className="flex gap-2">
-                                                                                        {act.transport!=='expense' && isOwner && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={14} /></button>}
-                                                                                        {act.transport==='expense' && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingExpense({...act, originalDate: selectedDate}); setModals({ ...modals, expense: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={14} /></button>}
-                                                                                        {(isOwner || (act.transport === 'expense' && act.createdBy === currentMember?.name)) && <button onClick={() => act.transport==='expense' ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>}
+                                                                                        {!isExpense && isOwner && <button onClick={() => { setEditingActivity(act); setModals({ ...modals, activity: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={14} /></button>}
+                                                                                        {isExpense && (isOwner || act.createdBy === currentMember?.name) && <button onClick={() => { setEditingExpense({...act, originalDate: selectedDate}); setModals({ ...modals, expense: true }); }} className="text-blue-400 hover:text-blue-600"><Pencil size={14} /></button>}
+                                                                                        {(isOwner || (isExpense && act.createdBy === currentMember?.name)) && <button onClick={() => isExpense ? deleteTransaction(act.id, selectedDate, act) : deleteActivity(act.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>}
                                                                                     </div>
                                                                                 </div>
                                                                                 <div className="flex gap-2 overflow-x-auto">{act.photoUrls?.map((p,i) => { 
-                                                                                    // FIX: Guard clause for dirty data (null photos)
                                                                                     if (!p) return null;
                                                                                     const url = typeof p === 'string' ? p : p.url; 
-                                                                                    {/* CRITICAL FIX: Add safe navigation operator ?. for currentMember */}
                                                                                     return (<div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded" onClick={()=>setModals({...modals, viewingImage:url})} />{(isOwner || (typeof p !== 'string' && p.uploader === currentMember?.name)) && <button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...act.photoUrls]; n.splice(i,1); updateActivity(act.id, 'photoUrls', n)}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button>}</div>) })}
-                                                                                    {/* [FIX] 傳入 data: act，確保上傳時能讀取舊照片而不覆蓋 */}
+                                                                                    {/* [FIX] 傳入 data: act，修復照片覆蓋問題 */}
                                                                                     <button onClick={()=>{setUploadTarget({type:'activity', id:act.id, data: act}); fileRef.current.click();}} className="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center text-gray-400"><Camera size={14}/></button>
                                                                                 </div>
                                                                             </div>
@@ -3154,7 +3151,7 @@
                                                             date={selectedDate} 
                                                             data={Array.isArray(tripData.accommodations?.[selectedDate]) ? tripData.accommodations[selectedDate] : (tripData.accommodations?.[selectedDate] ? [tripData.accommodations[selectedDate]] : [])} 
                                                             onUpdate={handleUpdateAccommodation} 
-                                                            // [FIX] 上傳時先查找該住宿的完整資料 (itemData) 並傳入，避免覆蓋舊照片
+                                                            // [FIX] 傳入 data: itemData，修復住宿照片覆蓋問題
                                                             onPhotoUpload={(id) => { 
                                                                 const currentList = Array.isArray(tripData.accommodations?.[selectedDate]) ? tripData.accommodations[selectedDate] : [];
                                                                 const itemData = currentList.find(i => i.id === id);
