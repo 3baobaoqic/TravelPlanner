@@ -804,7 +804,8 @@
 
         const ImageModal = ({ src, onClose }) => !src ? null : <div className="fixed inset-0 z-[70] bg-black/20 flex items-center justify-center p-4" onClick={onClose}><img src={src} className="max-w-full max-h-full object-contain rounded-lg" /></div>;
 
-        const SimplePieChart = ({ data }) => {
+        // [MODIFIED] 增加 onSliceClick 支援下鑽互動
+        const SimplePieChart = ({ data, onSliceClick }) => {
             const total = data.reduce((sum, item) => sum + item.value, 0);
             if (total === 0) return <div className="h-40 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-full w-40 mx-auto">尚無消費數據</div>;
             let currentAngle = 0;
@@ -819,13 +820,25 @@
                     const y2 = 50 + 50 * Math.sin(Math.PI * (currentAngle + angle) / 180);
                     const largeArc = angle > 180 ? 1 : 0;
                     const pathData = total === item.value ? `M 50 50 m -50, 0 a 50,50 0 1,0 100,0 a 50,50 0 1,0 -100,0` : `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArc} 1 ${x2} ${y2} Z`;
-                    const slice = <path key={i} d={pathData} fill={item.color} stroke="white" strokeWidth="1" />;
+                    
+                    // [MODIFIED] Add click handler and cursor style
+                    const slice = (
+                        <path 
+                            key={i} 
+                            d={pathData} 
+                            fill={item.color} 
+                            stroke="white" 
+                            strokeWidth="1" 
+                            onClick={() => onSliceClick && onSliceClick(item.category)}
+                            className={onSliceClick ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}
+                        />
+                    );
                     currentAngle += angle;
                     return slice;
                     })}
-                    <circle cx="50" cy="50" r="30" fill="#F5FDFC" />
+                    <circle cx="50" cy="50" r="30" fill="#F5FDFC" pointerEvents="none" />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col"><span className="text-xs text-gray-400">總支出</span><span className="text-lg font-bold text-gray-700">${total.toLocaleString()}</span></div>
+                <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none"><span className="text-xs text-gray-400">總支出</span><span className="text-lg font-bold text-gray-700">${total.toLocaleString()}</span></div>
                 </div>
             );
         };
@@ -1559,6 +1572,9 @@
             
             // [NEW] 新增統計檢視模式狀態：'category' (依類別) 或 'member' (依成員)
             const [expenseViewMode, setExpenseViewMode] = useState('category');
+            
+            // [NEW] 下鑽分類狀態：若有值，代表正在檢視該分類的成員分攤詳情
+            const [drillDownCategory, setDrillDownCategory] = useState(null);
 
             const [isCreating, setIsCreating] = useState(false); 
             const [editingActivity, setEditingActivity] = useState(null);
@@ -2749,16 +2765,22 @@
 
                 const datesToShow = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
                 
-                // [MODIFIED] Determine Grouping Logic based on View Mode
-                const isByMember = expenseViewMode === 'member';
+                // [MODIFIED] Determine Grouping Logic based on View Mode AND Drill Down
+                const isByMemberMode = expenseViewMode === 'member';
+                const isDrillDown = !!drillDownCategory;
+                
+                // 如果是「依成員」模式，或者是「下鑽」模式，都改用成員來分組
+                const effectiveGroupByMember = isByMemberMode || isDrillDown;
+
                 let groupKeys = [];
                 let getColor = (k) => '#ccc';
 
-                if (isByMember) {
-                    // Mode: By Member
+                if (effectiveGroupByMember) {
+                    // Mode: By Member (or Drill-down breakdown by member)
                     // [CRITICAL FIX] Ensure we don't crash on null members
                     const validMembers = (tripData.members || []).filter(m => m && m.name);
                     groupKeys = validMembers.map(m => m.name);
+                    groupKeys.push('未知'); // Handle edge case
                     
                     // Use a distinct palette for members
                     const MEMBER_PALETTE = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B6B', '#C9CBCF', '#4D5360', '#F7464A'];
@@ -2771,6 +2793,7 @@
                     // [FIX] Create a copy to avoid mutating state
                     groupKeys = [...(tripData.expenseCategories || Object.keys(CATEGORY_COLORS))];
                     if (!groupKeys.includes('住宿')) groupKeys.push('住宿'); // Ensure '住宿' exists
+                    if (!groupKeys.includes('其他')) groupKeys.push('其他');
                     getColor = (cat) => CATEGORY_COLORS[cat] || '#ccc';
                 }
 
@@ -2784,6 +2807,7 @@
                          const dayActs = tripData.itinerary?.[date] || [];
                          const dayAccoms = tripData.accommodations?.[date] || [];
                          
+                         // Filter relevant expenses for this day, payer, and THIS specific currency loop
                          const relevant = dayActs.filter(a => 
                             a && 
                             (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
@@ -2799,11 +2823,14 @@
                              const val = parseFloat(cost) || 0;
                              if (val <= 0) return;
                              
+                             // [DRILL DOWN FILTER] 如果正在下鑽，只計算符合該分類的項目
+                             if (isDrillDown && catName !== drillDownCategory) return;
+
                              dayTotal += val;
                              totalForCurrency += val;
                              
                              // Determine key based on mode
-                             const key = isByMember ? (payerName || '未知') : (catName || '其他');
+                             const key = effectiveGroupByMember ? (payerName || '未知') : (catName || '其他');
                              
                              // Initialize if not present (handle ad-hoc keys)
                              if (dayBreakdown[key] === undefined) dayBreakdown[key] = 0;
@@ -2860,6 +2887,8 @@
                         .sort((a, b) => b.value - a.value); // Sort by value descending
 
                     // Hide currency group if total is 0 AND user selected 'all'
+                    // But allow if we are drilling down to specific cat (might want to see 0?)
+                    // Keep hiding logic for cleaner UI
                     if (expenseFilterCurrency === 'all' && totalForCurrency === 0) return null;
 
                     return {
@@ -2869,20 +2898,7 @@
                         barData
                     };
                 }).filter(Boolean); // Remove nulls
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode]); // Added expenseViewMode dependency
-
-            const sortedExpensesByDate = useMemo(() => {
-                if (!tripData) return [];
-                const dates = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
-                const expenseList = [];
-                dates.forEach(date => {
-                    // 針對列表資料，加入付款人與幣別篩選
-                    // FIX: Added guard check (!a) to prevent crash on dirty data
-                    const dayExpenses = (tripData.itinerary?.[date] || []).filter(a => 
-                        a &&
-                        (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
-                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
-                        (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
+            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode, drillDownCategory]); // Added drillDownCategory dependency
                     );
                     
                     // [NEW] Add Accommodation items to the list (Only on Check-in Date)
@@ -3257,15 +3273,32 @@
                                                             </div>
                                                         </div>
                                                         
-                                                        {/* [NEW] 統計維度切換 (依類別 vs 依成員) */}
-                                                        <div className="flex bg-[#E2E2E2] p-1 rounded-xl mb-2">
-                                                            <button onClick={() => setExpenseViewMode('category')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'category' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>
-                                                                <PieChart size={12} /> 依類別
-                                                            </button>
-                                                            <button onClick={() => setExpenseViewMode('member')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'member' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>
-                                                                <Users size={12} /> 依成員分攤
-                                                            </button>
-                                                        </div>
+                                                        {/* [NEW] 統計維度切換與下鑽導航 */}
+                                                        {drillDownCategory ? (
+                                                            <div className="flex items-center gap-2 mb-2 bg-[#E0F2F1] p-2 rounded-xl text-sm border border-[#B2DFDB] animate-fade-in">
+                                                                <button 
+                                                                    onClick={() => setDrillDownCategory(null)} 
+                                                                    className="flex items-center gap-1 font-bold text-[#00695C] hover:underline"
+                                                                >
+                                                                    <ArrowRightCircle size={16} className="rotate-180"/> 返回
+                                                                </button>
+                                                                <span className="text-gray-400">|</span>
+                                                                <span className="font-bold text-gray-700 flex items-center gap-1">
+                                                                    <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: CATEGORY_COLORS[drillDownCategory] || '#ccc'}}></div>
+                                                                    {drillDownCategory} 分攤詳情
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            /* [NEW] 統計維度切換 (依類別 vs 依成員) - 僅在非下鑽模式顯示 */
+                                                            <div className="flex bg-[#E2E2E2] p-1 rounded-xl mb-2">
+                                                                <button onClick={() => setExpenseViewMode('category')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'category' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>
+                                                                    <PieChart size={12} /> 依類別
+                                                                </button>
+                                                                <button onClick={() => setExpenseViewMode('member')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'member' ? 'bg-white text-[#0ABAB5] shadow-sm' : 'text-gray-500'}`}>
+                                                                    <Users size={12} /> 依成員分攤
+                                                                </button>
+                                                            </div>
+                                                        )}
 
                                                         {/* Modified: Statistics Section Moved to Top */}
                                                         {expenseStatsByCurrency.length === 0 && sortedExpensesByDate.length > 0 ? (
@@ -3280,16 +3313,30 @@
                                                                     </div>
                                                                     
                                                                     <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee]">
-                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2"><PieChart size={16} /> 支出類別統計</h3>
-                                                                        <SimplePieChart data={stat.pieData} />
+                                                                        <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2">
+                                                                            <PieChart size={16} /> 
+                                                                            {drillDownCategory ? '成員分攤比例' : (expenseViewMode === 'member' ? '成員支出比例' : '支出類別統計')}
+                                                                            {!drillDownCategory && expenseViewMode === 'category' && <span className="text-[10px] text-gray-400 font-normal ml-2">(點擊圖表可查看分攤)</span>}
+                                                                        </h3>
+                                                                        {/* [MODIFIED] Pass onSliceClick to SimplePieChart */}
+                                                                        <SimplePieChart 
+                                                                            data={stat.pieData} 
+                                                                            onSliceClick={(!drillDownCategory && expenseViewMode === 'category') ? (cat) => setDrillDownCategory(cat) : null}
+                                                                        />
                                                                         
                                                                         {/* New: Category Breakdown List */}
                                                                         <div className="mt-6 space-y-2">
                                                                             {stat.pieData.map(item => (
-                                                                                <div key={item.category} className="flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0">
+                                                                                <div 
+                                                                                    key={item.category} 
+                                                                                    onClick={() => (!drillDownCategory && expenseViewMode === 'category') ? setDrillDownCategory(item.category) : null}
+                                                                                    className={`flex justify-between items-center text-xs border-b border-dashed border-gray-200 pb-2 last:border-0 last:pb-0 ${(!drillDownCategory && expenseViewMode === 'category') ? 'cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors' : ''}`}
+                                                                                >
                                                                                     <div className="flex items-center gap-2">
                                                                                         <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
                                                                                         <span className="text-gray-600 font-medium">{item.category}</span>
+                                                                                        {/* 下鑽指示箭頭 */}
+                                                                                        {!drillDownCategory && expenseViewMode === 'category' && <ArrowRightCircle size={10} className="text-gray-300" />}
                                                                                     </div>
                                                                                     <div className="flex items-center gap-2">
                                                                                         <span className="text-gray-400 text-[10px]">({Math.round((item.value / stat.total) * 100)}%)</span>
