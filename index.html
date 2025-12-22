@@ -3362,11 +3362,17 @@
                                                                             <PieChart size={16} /> 
                                                                             {drillDownCategory ? '成員分攤比例' : (expenseViewMode === 'member' ? '成員支出比例' : '支出類別統計')}
                                                                             {!drillDownCategory && expenseViewMode === 'category' && <span className="text-[10px] text-gray-400 font-normal ml-2">(點擊圖表可查看分攤)</span>}
+                                                                            {/* [MODIFIED] 新增提示：下鑽模式下，點擊圖表可返回 */}
+                                                                            {drillDownCategory && <span className="text-[10px] text-gray-400 font-normal ml-2 cursor-pointer" onClick={() => setDrillDownCategory(null)}>(點擊圖表返回)</span>}
                                                                         </h3>
-                                                                        {/* [MODIFIED] Pass onSliceClick to SimplePieChart */}
+                                                                        {/* [MODIFIED] 修改點擊邏輯：若已在下鑽模式 (drillDownCategory 有值)，點擊則清空 (返回) */}
                                                                         <SimplePieChart 
                                                                             data={stat.pieData} 
-                                                                            onSliceClick={(!drillDownCategory && expenseViewMode === 'category') ? (cat) => setDrillDownCategory(cat) : null}
+                                                                            onSliceClick={
+                                                                                drillDownCategory 
+                                                                                    ? () => setDrillDownCategory(null) 
+                                                                                    : (expenseViewMode === 'category' ? (cat) => setDrillDownCategory(cat) : null)
+                                                                            }
                                                                         />
                                                                         
                                                                         {/* New: Category Breakdown List */}
