@@ -3100,7 +3100,10 @@
                                                             {sortedActivities.map(act => {
                                                                 const isExpanded = expandedId === act.id;
                                                                 return (
-                                                                <div key={act.id} className={`bg-[#F5FDFC] rounded-xl border overflow-hidden ${act.transport==='expense'?'border-orange-100 bg-orange-50/30':'border-[#eeeeee]'}`}>
+                                                                // [MODIFIED] 根據是否為記帳項目 (transport==='expense') 設定不同的底色與邊框
+                                                                // 消費項目：bg-[#FFF5F2] (淺粉膚色，呼應 #D68C68), border-[#E6CEC5]
+                                                                // 一般行程：bg-[#F5FDFC] (原本的淺藍白), border-[#eeeeee]
+                                                                <div key={act.id} className={`rounded-xl border overflow-hidden ${act.transport==='expense' ? 'bg-[#FFF5F2] border-[#E6CEC5]' : 'bg-[#F5FDFC] border-[#eeeeee]'}`}>
                                                                     {/* [MODIFIED] 高度縮減為 2.2rem */}
                                                                     <div className="flex items-stretch min-h-[2.2rem] cursor-pointer" onClick={()=>setExpandedId(isExpanded?null:act.id)}>
                                                                         {/* [MODIFIED] 時間欄寬度縮減為 w-14 */}
