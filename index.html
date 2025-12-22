@@ -3590,51 +3590,63 @@
                                                                             <div className="space-y-2">
                                                                                 {items.map(e => {
                                                                                     const isCreator = e.createdBy === currentMember?.name;
-                                                                                    // [FIX] 擁有者權限解鎖：
-                                                                                    // 1. 刪除：擁有者可刪除一切 (含住宿)，協作者只能刪自己的
-                                                                                    // 2. 住宿項目 (isAccommodation) 只能被刪除，不能在此編輯 (需去行程頁)
                                                                                     const canDelete = isOwner || (!e.isAccommodation && isCreator);
                                                                                     const canEdit = !e.isAccommodation && (isOwner || isCreator);
                                                                                     
                                                                                     return (
-                                                                                    <div key={e.id} onClick={() => !e.isAccommodation && setModals({...modals, transaction:e})} className={`flex justify-between items-center bg-[#EDF7F6] p-2.5 rounded-lg border border-[#E0F2F1] ${!e.isAccommodation ? 'active:scale-[0.99] transition-transform cursor-pointer' : ''}`}>
-                                                                                        <div className="flex flex-col">
-                                                                                            <div className="font-bold text-gray-700 text-sm">{e.title || '未命名'}</div>
-                                                                                            <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                                                                <span className="bg-[#E2E2E2] px-1.5 py-0.5 rounded text-gray-500">{e.category}</span>
-                                                                                                <span>•</span><span>{e.payer}</span>
-                                                                                                {e.time && <span>• {e.time}</span>}
+                                                                                    // [MODIFIED] 修改 Layout：使用固定寬度的右側區塊來達成對齊
+                                                                                    <div key={e.id} onClick={() => !e.isAccommodation && setModals({...modals, transaction:e})} className={`flex items-center bg-[#EDF7F6] p-2 rounded-lg border border-[#E0F2F1] ${!e.isAccommodation ? 'active:scale-[0.99] transition-transform cursor-pointer' : ''}`}>
+                                                                                        
+                                                                                        {/* 左側：文字資訊 (Flex-1 自動填滿剩餘空間，支援換行) */}
+                                                                                        <div className="flex-1 min-w-0 pr-2 flex flex-col justify-center">
+                                                                                            <div className="font-bold text-gray-700 text-sm leading-tight break-words">{e.title || '未命名'}</div>
+                                                                                            <div className="text-[10px] text-gray-400 flex flex-wrap items-center gap-1 mt-1">
+                                                                                                <span className="bg-[#E2E2E2] px-1.5 py-0.5 rounded text-gray-500 whitespace-nowrap">{e.category}</span>
+                                                                                                <span className="whitespace-nowrap">• {e.payer}</span>
+                                                                                                {e.time && <span className="whitespace-nowrap">• {e.time}</span>}
                                                                                             </div>
                                                                                         </div>
-                                                                                        <div className="flex items-center gap-3">
-                                                                                            <div className="text-red-500 font-bold text-sm bg-red-50 px-2 py-1 rounded-lg">-{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span></div>
+
+                                                                                        {/* 右側：金額與按鈕 (固定寬度區塊，確保上下對齊) */}
+                                                                                        <div className="flex items-center shrink-0 gap-1">
                                                                                             
-                                                                                            {/* Edit Button */}
-                                                                                            {canEdit && (
-                                                                                                <button 
-                                                                                                    onClick={(evt) => { 
-                                                                                                        evt.stopPropagation(); 
-                                                                                                        setEditingExpense({ ...e, originalDate: date }); 
-                                                                                                        setModals({...modals, expense: true}); 
-                                                                                                    }} 
-                                                                                                    className="text-gray-400 hover:text-blue-500 p-1 rounded-full hover:bg-blue-50 transition-colors"
-                                                                                                >
-                                                                                                    <Edit3 size={16} />
-                                                                                                </button>
-                                                                                            )}
+                                                                                            {/* 金額：固定寬度 w-24 (約96px)，向右對齊，確保數字整齊排列 */}
+                                                                                            <div className="w-24 flex justify-end">
+                                                                                                <div className="text-red-500 font-bold text-sm bg-red-50 px-2 py-1 rounded-lg text-right truncate w-full">
+                                                                                                    -{e.cost} <span className="text-[10px] font-normal text-red-400">{e.currency}</span>
+                                                                                                </div>
+                                                                                            </div>
                                                                                             
-                                                                                            {/* Delete Button */}
-                                                                                            {canDelete && (
-                                                                                                <button 
-                                                                                                    onClick={(evt) => { 
-                                                                                                        evt.stopPropagation(); 
-                                                                                                        deleteTransaction(e.id, date, e); 
-                                                                                                    }} 
-                                                                                                    className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"
-                                                                                                >
-                                                                                                    <Trash2 size={16} />
-                                                                                                </button>
-                                                                                            )}
+                                                                                            {/* 編輯按鈕格：固定 w-8，若無權限則留白 (Empty Div) */}
+                                                                                            <div className="w-8 flex justify-center">
+                                                                                                {canEdit ? (
+                                                                                                    <button 
+                                                                                                        onClick={(evt) => { 
+                                                                                                            evt.stopPropagation(); 
+                                                                                                            setEditingExpense({ ...e, originalDate: date }); 
+                                                                                                            setModals({...modals, expense: true}); 
+                                                                                                        }} 
+                                                                                                        className="text-gray-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition-colors"
+                                                                                                    >
+                                                                                                        <Edit3 size={16} />
+                                                                                                    </button>
+                                                                                                ) : <div className="w-8"></div>}
+                                                                                            </div>
+                                                                                            
+                                                                                            {/* 刪除按鈕格：固定 w-8，若無權限則留白 */}
+                                                                                            <div className="w-8 flex justify-center">
+                                                                                                {canDelete ? (
+                                                                                                    <button 
+                                                                                                        onClick={(evt) => { 
+                                                                                                            evt.stopPropagation(); 
+                                                                                                            deleteTransaction(e.id, date, e); 
+                                                                                                        }} 
+                                                                                                        className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors"
+                                                                                                    >
+                                                                                                        <Trash2 size={16} />
+                                                                                                    </button>
+                                                                                                ) : <div className="w-8"></div>}
+                                                                                            </div>
                                                                                         </div>
                                                                                     </div>
                                                                                 );
