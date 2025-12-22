@@ -3337,11 +3337,11 @@
                                                         ) : (
                                                             /* [NEW] 統計維度切換 (依類別 vs 依成員) - 僅在非下鑽模式顯示 */
                                                             <div className="flex bg-[#E2E2E2] p-1 rounded-xl mb-2">
-                                                                {/* [MODIFIED] 按鈕選取狀態：改為實心背景色 #D68C68 配白色文字，更為顯眼 */}
-                                                                <button onClick={() => setExpenseViewMode('category')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'category' ? 'bg-[#D68C68] text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}>
+                                                                {/* [MODIFIED] 按鈕選取狀態：改為實心背景色 #4DB6AC (淺綠) 配白色文字，符合上方色系但較淡 */}
+                                                                <button onClick={() => setExpenseViewMode('category')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'category' ? 'bg-[#4DB6AC] text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}>
                                                                     <PieChart size={12} /> 依類別
                                                                 </button>
-                                                                <button onClick={() => setExpenseViewMode('member')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'member' ? 'bg-[#D68C68] text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}>
+                                                                <button onClick={() => setExpenseViewMode('member')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${expenseViewMode === 'member' ? 'bg-[#4DB6AC] text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}>
                                                                     <Users size={12} /> 依成員分攤
                                                                 </button>
                                                             </div>
