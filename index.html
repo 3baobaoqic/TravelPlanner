@@ -51,7 +51,7 @@
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download } from 'lucide-react';
+        import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download, ExternalLink } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
 
@@ -245,30 +245,21 @@
             }, [isOffline, pendingJoinId, onJoin]);
 
             const parseConfig = (str) => {
-                // 1. 嘗試直接 JSON Parse (針對完整複製貼上的標準 JSON)
                 try {
                     return JSON.parse(str);
                 } catch (e) {
-                    // 2. 嘗試補上大括號後 Parse (針對系統自動格式化後移除了大括號的字串)
-                    try {
-                        return JSON.parse(`{${str}}`);
-                    } catch (e2) {
-                        // 3. Regex 解析 Fallback (針對 JS 物件格式或其他非標準格式)
-                        const obj = {};
-                        const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
-                        let found = false;
-                        keys.forEach(key => {
-                            // [FIX] 修改 Regex: 允許 Key 前後有引號 (["']?) 
-                            // 解決 "apiKey": "..." 格式無法被辨識的問題
-                            const regex = new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']+)["']`, 'i');
-                            const match = str.match(regex);
-                            if (match && match[1]) {
-                                obj[key] = match[1];
-                                found = true;
-                            }
-                        });
-                        return found ? obj : null;
-                    }
+                    const obj = {};
+                    const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+                    let found = false;
+                    keys.forEach(key => {
+                        const regex = new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`, 'i');
+                        const match = str.match(regex);
+                        if (match && match[1]) {
+                            obj[key] = match[1];
+                            found = true;
+                        }
+                    });
+                    return found ? obj : null;
                 }
             };
 
@@ -760,7 +751,7 @@
                                     <select value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-[#E2E2E2] rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-[#0ABAB5] border border-[#eeeeee]">
                                         <option value="">-- 請選擇 --</option>
                                         {tripData.members.map(m => {
-                                            // Guard clause
+                                            // FIX: Guard clause
                                             if (!m) return null;
                                             return <option key={m.name} value={m.name}>{m.name}</option>;
                                         })}
@@ -784,11 +775,13 @@
             );
         };
 
-        const AutoSaveInput = ({ value, onSave, readOnly, ...props }) => {
+        // [MODIFIED] 升級 AutoSaveInput：支援網址自動連結 (detectLinks 模式)
+        const AutoSaveInput = ({ value, onSave, readOnly, detectLinks, ...props }) => {
             const [v, setV] = useState(value ?? '');
+            const [isEditing, setIsEditing] = useState(false); // 控制編輯狀態
+            
             useEffect(() => setV(value ?? ''), [value]);
             
-            // FIX: Ensure comparison handles null/undefined correctly to avoid unnecessary saves when data is dirty
             const handleBlur = () => {
                 const normalizedV = v === null || v === undefined ? '' : String(v);
                 const normalizedValue = value === null || value === undefined ? '' : String(value);
@@ -796,9 +789,66 @@
                 if (normalizedV !== normalizedValue) {
                     onSave(v);
                 }
+                if (detectLinks) setIsEditing(false); // 編輯完成後切回檢視模式
             };
             
-            const propsFinal = { ...props, value: v, onChange: e => setV(e.target.value), onBlur: handleBlur, onKeyDown: e => e.key === 'Enter' && e.target.blur(), readOnly };
+            // [NEW] 檢視模式：渲染帶有超連結的文字
+            if (detectLinks && !isEditing) {
+                const text = v === null || v === undefined ? '' : String(v);
+                
+                // Helper: 解析 URL 並轉換為 <a> 標籤
+                const renderWithLinks = (str) => {
+                    if (!str) return null;
+                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                    const parts = str.split(urlRegex);
+                    return parts.map((part, i) => {
+                        if (part.match(urlRegex)) {
+                            return (
+                                <a 
+                                    key={i} 
+                                    href={part} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-blue-500 underline break-all relative z-20 hover:text-blue-700"
+                                    onClick={(e) => e.stopPropagation()} // 防止點擊連結時觸發編輯模式
+                                >
+                                    {part}
+                                </a>
+                            );
+                        }
+                        return part;
+                    });
+                };
+
+                return (
+                    <div 
+                        onClick={(e) => { 
+                             if (!readOnly) {
+                                 e.stopPropagation(); 
+                                 setIsEditing(true); // 點擊文字進入編輯模式
+                             }
+                        }}
+                        // 模仿原本 input 的樣式，但允許換行與連結點擊
+                        className={`${props.className} cursor-text min-h-[1.5rem] whitespace-pre-wrap break-words flex items-center`}
+                        style={{ cursor: readOnly ? 'default' : 'text' }}
+                    >
+                        {text ? renderWithLinks(text) : <span className="text-gray-400 opacity-60 italic">{props.placeholder}</span>}
+                    </div>
+                );
+            }
+            
+            const propsFinal = { 
+                ...props, 
+                value: v, 
+                onChange: e => setV(e.target.value), 
+                onBlur: handleBlur, 
+                onKeyDown: e => {
+                    // [MODIFIED] 僅在非 textarea 時按 Enter 儲存
+                    if (props.type !== 'textarea' && e.key === 'Enter') e.target.blur();
+                }, 
+                readOnly,
+                autoFocus: detectLinks && isEditing // 切換到編輯模式時自動聚焦
+            };
             return props.type === 'textarea' ? <textarea {...propsFinal} /> : <input {...propsFinal} />;
         };
 
@@ -1013,9 +1063,11 @@
                                         {/* Note Input Row */}
                                         <div className="px-1 flex gap-2 items-center">
                                             <div className="flex-[2] min-w-0">
+                                                {/* [MODIFIED] 啟用 detectLinks 功能 */}
                                                 <AutoSaveInput 
                                                     type="text" 
                                                     readOnly={!isOwner} 
+                                                    detectLinks={true}
                                                     placeholder="備註 (Wifi/密碼...)" 
                                                     value={item.note} 
                                                     onSave={(val) => onUpdate(item.id, 'note', val)} 
@@ -1352,95 +1404,6 @@
                         </div>
                     </div>
                     <ConfirmModal isOpen={confirm.open} message="確定刪除照片？" onConfirm={() => { const n = [...formData.photoUrls]; n.splice(confirm.idx, 1); setFormData({...formData, photoUrls: n}); setConfirm({open:false}); }} onCancel={() => setConfirm({open:false})} />
-                </div>
-                </>
-            );
-        };
-
-        const ExpenseModal = ({ isOpen, onClose, onSave, onUpdateCategories, selectedDate, currentMember, defaultValues, tripData }) => {
-            const [formData, setFormData] = useState({ date: selectedDate, time: '', cost: '', title: '', payer: '', currency: '', category: '', photoUrls: [], note: '' });
-            const [isManage, setIsManage] = useState(false);
-            const [newCat, setNewCat] = useState('');
-            const [confirm, setConfirm] = useState({ open: false, action: null, msg: '' });
-            const fileRef = useRef(null);
-            
-            useEffect(() => {
-                 if(isOpen) {
-                     if (defaultValues) {
-                         setFormData({
-                             date: defaultValues.originalDate || selectedDate,
-                             time: defaultValues.time || '',
-                             cost: defaultValues.cost || '',
-                             title: defaultValues.title || '',
-                             payer: defaultValues.payer || '',
-                             currency: defaultValues.currency || '',
-                             category: defaultValues.category || '',
-                             photoUrls: defaultValues.photoUrls || [],
-                             note: defaultValues.note || ''
-                         });
-                     } else {
-                         setFormData({ 
-                             date: selectedDate,
-                             time: new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}), 
-                             cost: '', 
-                             title: '', 
-                             payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
-                             currency: tripData?.currency || 'JPY', 
-                             category: '餐飲', 
-                             photoUrls: [],
-                             note: ''
-                         });
-                     }
-                 }
-            }, [isOpen, tripData, currentMember, defaultValues, selectedDate]);
-
-            if (!isOpen) return null;
-            
-            // Modified: Use processImageUpload for unified logic
-            const handleFile = async (e) => { 
-                const f = e.target.files[0]; 
-                if(f) { 
-                    const url = await processImageUpload(f); 
-                    if(url) setFormData(p => ({...p, photoUrls: [...(p.photoUrls || []), url]})); 
-                } 
-                e.target.value=''; 
-            };
-            
-            return (
-                <>
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-                    <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
-                    <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
-                        <div className="bg-[#D68C68] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯記帳' : '新增記帳'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
-                        {/* FIX: Added flex-1 to ensure correct scrolling behavior */}
-                        <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                            <div className="flex items-end gap-2">
-                                <div className="w-[50%]"><label className="text-xs text-gray-400 font-bold block">金額</label><div className="relative"><DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl pl-7 p-2 text-xl font-bold text-gray-800 border border-[#eeeeee]" autoFocus /></div></div>
-                                <div className="w-[20%]"><label className="text-xs text-gray-400 font-bold block">幣別</label><select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select></div>
-                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label>
-                                    <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">
-                                        {tripData.members.map(m => (
-                                            // FIX: Guard clause to prevent crash if member is null
-                                            m ? <option key={m.name} value={m.name}>{m.name}</option> : null
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-2"><label className="text-xs text-gray-400 font-bold">分類</label><button onClick={()=>setIsManage(!isManage)} className="text-xs text-[#D68C68] flex items-center gap-1 font-bold"><Settings size={12}/>管理</button></div>
-                                {isManage ? <div className="bg-[#E2E2E2] p-2 rounded-xl mb-2 border border-[#eeeeee]"><div className="flex flex-wrap gap-1 mb-2">{(tripData.expenseCategories||[]).map(c=><span key={c} className="bg-white px-2 py-1 rounded text-[10px] flex items-center gap-1 border border-[#eeeeee]">{c}<button onClick={()=>setConfirm({open:true, msg:`刪除 ${c}?`, action:()=>onUpdateCategories((tripData.expenseCategories||[]).filter(x=>x!==c))})}><X size={10}/></button></span>)}</div><div className="flex gap-1"><input value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="新分類" className="flex-1 p-1 text-xs rounded text-gray-700 border border-[#eeeeee]" /><button onClick={()=>{if(newCat){onUpdateCategories([...(tripData.expenseCategories||[]), newCat]); setNewCat('');}}} className="bg-green-500 text-white p-1 rounded border border-green-500"><Plus size={14}/></button></div></div> : <div className="flex flex-wrap gap-1.5">{(tripData.expenseCategories||[]).map(c=><button key={c} onClick={()=>setFormData({...formData, category:c})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${formData.category===c?'bg-[#D68C68] text-white border-[#D68C68]':'bg-[#E2E2E2] text-gray-600 border-[#eeeeee]'}`}>{c}</button>)}</div>}
-                            </div>
-                            <div className="flex gap-2">
-                                <input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="flex-1 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
-                                <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-1/3 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
-                            </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
-                            <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={1} placeholder="備註..." className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee] resize-none" /></div>
-                            <div><label className="text-xs text-gray-400 font-bold block">照片</label><div className="flex gap-2 overflow-x-auto">{formData.photoUrls?.map((url, i)=><div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...formData.photoUrls]; n.splice(i,1); setFormData({...formData, photoUrls:n})}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>)}<button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16}/></button><input type="file" ref={fileRef} className="hidden" onChange={handleFile} /></div></div>
-                            <button onClick={()=>{if(parseFloat(formData.cost)>0) { onSave(formData); }}} disabled={!formData.cost} className="w-full py-3 bg-[#D68C68] text-white rounded-xl font-bold shadow-md border border-[#D68C68]">{defaultValues ? '儲存變更' : '儲存'}</button>
-                        </div>
-                    </div>
-                    <ConfirmModal isOpen={confirm.open} message={confirm.msg} onConfirm={()=>{confirm.action(); setConfirm({open:false});}} onCancel={()=>setConfirm({open:false})} />
                 </div>
                 </>
             );
@@ -3185,7 +3148,8 @@
                                                                     </div>
                                                                     <div className={`transition-all ${isExpanded?'max-h-[500px]':'max-h-0'}`}>
                                                                         <div className="p-3 border-t border-gray-100 bg-[#F5FDFC] space-y-2">
-                                                                            <AutoSaveInput value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-xs bg-[#E2E2E2] rounded-lg p-2 text-gray-700 border border-[#eeeeee]" />
+                                                                            {/* [MODIFIED] 啟用 detectLinks 功能 */}
+                                                                            <AutoSaveInput detectLinks={true} value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-xs bg-[#E2E2E2] rounded-lg p-2 text-gray-700 border border-[#eeeeee]" />
                                                                             {!isExpense && <div className="grid grid-cols-2 gap-2">
                                                                                 <div className="bg-[#E2E2E2] p-1.5 rounded-lg border border-[#eeeeee]"><label className="text-[9px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700"/></div>
                                                                                 <div className="bg-[#E2E2E2] p-1.5 rounded-lg border border-[#eeeeee]"><label className="text-[9px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700"/></div>
