@@ -131,7 +131,7 @@
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
         };
 
-        // --- Error Boundary Component (New Addition) ---
+        // --- Error Boundary Component ---
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
@@ -1085,7 +1085,12 @@
                                                         const canDelete = isOwner || (currentMember && uploader === currentMember.name);
                                                         return ( <div key={i} className="relative flex-shrink-0"> <img src={url} className="w-10 h-10 object-cover rounded-lg border border-yellow-200 cursor-zoom-in" onClick={() => onViewImage(url)} /> {canDelete && <button onClick={() => onPhotoDelete(item.id, url, 'accom')} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"><X size={10} /></button>} </div> );
                                                     })}
-                                                    <button onClick={() => onPhotoUpload(item.id)} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
+                                                    {/* [FIX] 傳入 data: itemData，修復住宿照片覆蓋問題 */}
+                                                    <button onClick={() => {
+                                                        const currentList = Array.isArray(data) ? data : [];
+                                                        const itemData = currentList.find(i => i.id === item.id);
+                                                        onPhotoUpload(item.id, itemData); 
+                                                    }} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-yellow-300 text-yellow-500 hover:text-yellow-600 hover:border-yellow-600 rounded-lg transition-colors flex-shrink-0 bg-yellow-100"><Image size={16} /></button>
                                             </div>
                                         </div>
                                     </div>
@@ -1597,7 +1602,12 @@
             useEffect(() => {
                 const storedRecents = localStorage.getItem('gtp_recent_trips');
                 if (storedRecents) {
-                    setRecentTrips(JSON.parse(storedRecents));
+                    try {
+                        setRecentTrips(JSON.parse(storedRecents));
+                    } catch (e) {
+                        console.error("Error parsing recent trips", e);
+                        localStorage.removeItem('gtp_recent_trips');
+                    }
                 }
                 
                 // Clear restore data AFTER it's been used for initialization
@@ -1609,7 +1619,14 @@
                 // Check if firebase config exists, try to init (silent mode)
                 const storedConfig = localStorage.getItem('gtp_firebase_config');
                 if (storedConfig) {
-                    reInit(JSON.parse(storedConfig));
+                    try {
+                        reInit(JSON.parse(storedConfig));
+                    } catch (e) {
+                        console.error("Error parsing firebase config", e);
+                        // Don't nuke config, might be transient error, but fallback to local
+                        setIsOffline(true);
+                        setUser({ uid: 'local' });
+                    }
                 } else {
                     // Fix: If no config, default to local mode immediately
                     setIsOffline(true);
@@ -1648,9 +1665,6 @@
                     await signInAnonymously(auth);
 
                     // --- IDENTITY MIGRATION FIX START ---
-                    // 修正：離線轉線上時的身分識別衝突
-                    // 當 Firebase 連線成功後，檢查本地資料。若發現舊的「離線隨機 ID」，
-                    // 自動將其遷移為新的「Firebase UID」，確保使用者不失去 Owner 權限。
                     const fbUser = auth.currentUser;
                     const localOfflineId = localStorage.getItem('gtp_local_uid');
 
@@ -1855,8 +1869,13 @@
                             if (d) { 
                                 setTripData(d);
                                 
-                                // Fix: Check ref instead of stale state variable to prevent unwanted reset
-                                if(!selectedDateRef.current) setSelectedDate(d.startDate);
+                                // [CRITICAL FIX] 智慧日期校正：如果當前選取日期無效或不在範圍內，重置為開始日期
+                                // 避免切換旅程時停留在舊日期導致白屏(空畫面)
+                                const current = selectedDateRef.current;
+                                const inRange = current >= d.startDate && current <= d.endDate;
+                                if (!current || !inRange) {
+                                    setSelectedDate(d.startDate);
+                                }
                                 
                                 // [FIX] 離線模式嚴格身分檢查
                                 const found = d.members.find(m => m.deviceId === userId);
@@ -1916,7 +1935,12 @@
                                 if (d) {
                                     setTripData(d);
                                     
-                                    if(!selectedDateRef.current) setSelectedDate(d.startDate);
+                                    // [CRITICAL FIX] 智慧日期校正 (線上版)
+                                    const current = selectedDateRef.current;
+                                    const inRange = current >= d.startDate && current <= d.endDate;
+                                    if (!current || !inRange) {
+                                        setSelectedDate(d.startDate);
+                                    }
                                     
                                     const currentAuthUser = getAuth(apps[0]).currentUser;
                                     if(currentAuthUser) {
@@ -2009,6 +2033,10 @@
                         setTripData(newData);
                         setCurrentMember(initialMember);
                         setTripId(id);
+                        
+                        // [CRITICAL FIX] 建立後立即設定選取日期，避免進入時畫面空白
+                        setSelectedDate(newData.startDate);
+                        
                         setView('planner');
                     } else {
                          const apps = getApps();
@@ -2019,6 +2047,10 @@
                                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', id), sanitizeFirestoreData(newData));
                                 setTripId(id);
                                 setCurrentMember(initialMember);
+                                
+                                // [CRITICAL FIX] 建立後立即設定選取日期
+                                setSelectedDate(newData.startDate);
+                                
                                 setView('planner');
                              } catch (e) {
                                  console.error(e);
@@ -2899,6 +2931,19 @@
                     };
                 }).filter(Boolean); // Remove nulls
             }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode, drillDownCategory]); // Added drillDownCategory dependency
+
+            const sortedExpensesByDate = useMemo(() => {
+                if (!tripData) return [];
+                const dates = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
+                const expenseList = [];
+                dates.forEach(date => {
+                    // 針對列表資料，加入付款人與幣別篩選
+                    // FIX: Added guard check (!a) to prevent crash on dirty data
+                    const dayExpenses = (tripData.itinerary?.[date] || []).filter(a => 
+                        a &&
+                        (a.transport === 'expense' || (a.cost && a.cost > 0)) &&
+                        (expenseFilterPayer === 'all' || a.payer === expenseFilterPayer) &&
+                        (expenseFilterCurrency === 'all' || a.currency === expenseFilterCurrency)
                     );
                     
                     // [NEW] Add Accommodation items to the list (Only on Check-in Date)
