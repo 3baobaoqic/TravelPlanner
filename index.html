@@ -1625,6 +1625,7 @@
             const fileRef = useRef(null);
             const [uploadTarget, setUploadTarget] = useState(null);
             const [expenseFilterDate, setExpenseFilterDate] = useState('all');
+            const [expenseListFilterDate, setExpenseListFilterDate] = useState('all'); // [NEW] 新增：詳細列表專用的日期篩選狀態
             const [expenseFilterPayer, setExpenseFilterPayer] = useState('all'); // 新增：付款人篩選狀態
             const [expenseFilterCurrency, setExpenseFilterCurrency] = useState('all'); // 新增：幣別篩選狀態
             
@@ -3068,7 +3069,8 @@
 
             const sortedExpensesByDate = useMemo(() => {
                 if (!tripData) return [];
-                const dates = expenseFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseFilterDate];
+                // [MODIFIED] 改為使用 expenseListFilterDate (列表專用篩選)
+                const dates = expenseListFilterDate === 'all' ? getDatesArray(tripData.startDate, tripData.endDate) : [expenseListFilterDate];
                 const expenseList = [];
                 dates.forEach(date => {
                     // 針對列表資料，加入付款人與幣別篩選
@@ -3101,7 +3103,7 @@
                     if (combinedItems.length > 0) { expenseList.push({ date, items: combinedItems }); }
                 });
                 return expenseList;
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency]); // 加入 expenseFilterCurrency 依賴
+            }, [tripData, expenseListFilterDate, expenseFilterPayer, expenseFilterCurrency]); // [MODIFIED] 依賴改為 expenseListFilterDate
 
             const sortedActivities = useMemo(() => {
                 const acts = tripData?.itinerary?.[selectedDate] || [];
@@ -3576,7 +3578,26 @@
                                                         )}
 
                                                         <div className="bg-[#F5FDFC] p-4 rounded-xl border border-[#eeeeee] shadow-sm">
-                                                            <div className="mb-2 text-xs font-bold text-gray-400">詳細列表</div>
+                                                            {/* [MODIFIED] 修改標題列，加入獨立的日期下拉選單 */}
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <div className="text-xs font-bold text-gray-400">詳細列表</div>
+                                                                <div className="relative">
+                                                                    <select 
+                                                                        value={expenseListFilterDate} 
+                                                                        onChange={(e) => setExpenseListFilterDate(e.target.value)} 
+                                                                        className="appearance-none bg-transparent pl-2 pr-4 text-[10px] font-bold text-[#0ABAB5] outline-none cursor-pointer hover:underline text-right"
+                                                                    >
+                                                                        <option value="all">顯示全部日期</option>
+                                                                        {getDatesArray(tripData.startDate, tripData.endDate).map(date => (
+                                                                            <option key={date} value={date}>{date} ({getDayOfWeek(date)})</option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-[#0ABAB5]">
+                                                                        <ChevronDown size={10} />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            
                                                             {sortedExpensesByDate.length === 0 ? (
                                                                 <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-xl">尚無消費紀錄</div>
                                                             ) : (
