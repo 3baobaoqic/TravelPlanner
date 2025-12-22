@@ -3240,9 +3240,35 @@
                                                                         <div className="p-3 border-t border-gray-100 bg-[#F5FDFC] space-y-2">
                                                                             {/* [MODIFIED] 啟用 detectLinks 功能 */}
                                                                             <AutoSaveInput detectLinks={true} value={act.note} onSave={v=>updateActivity(act.id,'note',v)} readOnly={!isOwner} placeholder="備註..." className="w-full text-xs bg-[#E2E2E2] rounded-lg p-2 text-gray-700 border border-[#eeeeee]" />
+                                                                            
+                                                                            {/* [NEW] 自動偵測備註中的連結並顯示按鈕 */}
+                                                                            {act.note && act.note.match(/(https?:\/\/[^\s]+)/g) && (
+                                                                                <div className="flex flex-wrap gap-2 px-1">
+                                                                                    {act.note.match(/(https?:\/\/[^\s]+)/g).map((url, idx) => (
+                                                                                        <a 
+                                                                                            key={idx} 
+                                                                                            href={url} 
+                                                                                            target="_blank" 
+                                                                                            rel="noopener noreferrer" 
+                                                                                            className="inline-flex items-center gap-1 text-[10px] text-[#0ABAB5] bg-[#E0F2F1] px-2 py-1 rounded-md border border-[#B2DFDB] hover:bg-[#B2DFDB] transition-colors no-underline"
+                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                        >
+                                                                                            <ExternalLink size={10} /> 連結 {idx + 1}
+                                                                                        </a>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+
                                                                             {!isExpense && <div className="grid grid-cols-2 gap-2">
-                                                                                <div className="bg-[#E2E2E2] p-1.5 rounded-lg border border-[#eeeeee]"><label className="text-[9px] text-gray-400 font-bold">代碼</label><AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700"/></div>
-                                                                                <div className="bg-[#E2E2E2] p-1.5 rounded-lg border border-[#eeeeee]"><label className="text-[9px] text-gray-400 font-bold">費用</label><AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700"/></div>
+                                                                                {/* [MODIFIED] 改為左右排列 (Flex) 以縮減高度 */}
+                                                                                <div className="flex items-center gap-2 bg-[#E2E2E2] px-2 py-1 rounded-lg border border-[#eeeeee]">
+                                                                                    <label className="text-[10px] text-gray-400 font-bold whitespace-nowrap">代碼</label>
+                                                                                    <AutoSaveInput value={act.bookingCode} onSave={v=>updateActivity(act.id,'bookingCode',v)} readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700 outline-none"/>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2 bg-[#E2E2E2] px-2 py-1 rounded-lg border border-[#eeeeee]">
+                                                                                    <label className="text-[10px] text-gray-400 font-bold whitespace-nowrap">費用</label>
+                                                                                    <AutoSaveInput value={act.cost} onSave={v=>updateActivity(act.id,'cost',v)} type="number" readOnly={!isOwner} className="text-xs bg-transparent w-full text-gray-700 outline-none"/>
+                                                                                </div>
                                                                             </div>}
                                                                             {isExpense && <div className="flex gap-2 bg-orange-50 p-2 rounded-lg border border-orange-100 text-xs"><div className="flex-1 text-orange-600 font-bold">${act.cost}</div><div className="flex-1">{act.currency}</div><div className="flex-1">{act.category}</div><div className="text-[10px] text-gray-400 self-center">{act.payer}付</div></div>}
                                                                             <div>
