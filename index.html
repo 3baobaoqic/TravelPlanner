@@ -3305,18 +3305,25 @@
                                                                 const isExpense = act.transport === 'expense';
                                                                 return (
                                                                 <div key={act.id} className={`rounded-xl border overflow-hidden ${isExpense ? 'bg-[#FFF5F2] border-[#E6CEC5]' : 'bg-[#F5FDFC] border-[#eeeeee]'}`}>
-                                                                    {/* [MODIFIED] 高度縮減為 2.2rem */}
+                                                                    {/* [MODIFIED] 高度維持 2.2rem */}
                                                                     <div className="flex items-stretch min-h-[2.2rem] cursor-pointer" onClick={()=>setExpandedId(isExpanded?null:act.id)}>
-                                                                        {/* [MODIFIED] 左側寬度與內距調整 */}
+                                                                        {/* 左側時間欄 */}
                                                                         <div className="w-14 flex flex-col items-center justify-center border-r border-gray-100 bg-white/50 py-0.5 px-0.5">
                                                                             <div onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.time} onSave={v=>updateActivity(act.id,'time',v)} readOnly={!isOwner} className="font-bold text-xs text-center bg-transparent w-full outline-none p-0 text-gray-700 leading-none" /></div>
-                                                                            {/* [MODIFIED] 移除 "$" 圖示，保持下方空白以維持對齊結構 */}
                                                                             {isExpense ? <div className="text-[10px] text-orange-400 flex items-center gap-0.5 mt-0"></div> : <div className="flex items-center justify-center gap-0.5 mt-0 w-full"></div>}
                                                                         </div>
-                                                                        <div className="flex-1 flex items-center px-2 overflow-hidden"><div className="w-full" onClick={(e) => e.stopPropagation()}><AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner} className="font-bold text-sm bg-transparent w-full text-gray-800 leading-tight" /></div></div>
-                                                                        <div className="flex items-center pr-2 gap-1">
+                                                                        
+                                                                        {/* [MODIFIED] 中間標題欄：增加 py-1 縮小實際觸發編輯的範圍 (點擊上下邊緣可展開) */}
+                                                                        <div className="flex-1 flex items-center px-2 overflow-hidden">
+                                                                            <div className="w-full py-1" onClick={(e) => e.stopPropagation()}>
+                                                                                <AutoSaveInput value={act.title} onSave={v=>updateActivity(act.id,'title',v)} readOnly={!isOwner} className="font-bold text-sm bg-transparent w-full text-gray-800 leading-tight" />
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        {/* [MODIFIED] 右側按鈕欄：加寬至 w-12 並置中，擴大點擊展開的範圍 */}
+                                                                        <div className="w-12 flex items-center justify-center gap-1 bg-black/5 hover:bg-black/10 transition-colors">
                                                                             {!isExpense && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={12} /></button>}
-                                                                            <ChevronDown size={14} className={`text-gray-300 transition ${isExpanded?'rotate-180':''}`}/>
+                                                                            <ChevronDown size={16} className={`text-gray-400 transition ${isExpanded?'rotate-180':''}`}/>
                                                                         </div>
                                                                     </div>
                                                                     <div className={`transition-all ${isExpanded?'max-h-[500px]':'max-h-0'}`}>
