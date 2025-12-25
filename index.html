@@ -50,7 +50,8 @@
         import { createRoot } from 'react-dom/client';
         import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        // [MODIFIED] Import enableIndexedDbPersistence
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
         import { Calendar, MapPin, Clock, Train, Bus, Car, Footprints, Plane, TramFront, Plus, Trash2, Map, ArrowRight, Image, Loader, X, DollarSign, Navigation, PieChart, Menu, History, LogOut, Check, CloudSun, Timer, BarChart3, BedDouble, Phone, LogOut as CheckOutIcon, Settings, Camera, ChevronDown, LogIn, LogOut as LogOutIcon, Pencil, Users, Edit3, CloudCog, Shield, Save, UserX, Copy, Wifi, WifiOff, Database, ArrowRightCircle, Info, Download, ExternalLink } from 'lucide-react';
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-travel-planner';
@@ -1714,6 +1715,19 @@
                     const app = initializeApp(config);
                     const auth = getAuth(app);
                     const db = getFirestore(app);
+                    
+                    // [NEW] 啟用 Firebase 原生離線持久化 (Offline Persistence)
+                    // 這讓 App 在網路斷線時仍可讀寫快取資料，連線後自動同步
+                    try {
+                        await enableIndexedDbPersistence(db);
+                        console.log("Firebase Offline Persistence Enabled");
+                    } catch (err) {
+                        if (err.code == 'failed-precondition') {
+                            console.warn('多個分頁開啟中，持久化僅能在一個分頁啟用');
+                        } else if (err.code == 'unimplemented') {
+                            console.warn('瀏覽器不支援持久化功能');
+                        }
+                    }
                     
                     // Wait for auth state
                     await signInAnonymously(auth);
