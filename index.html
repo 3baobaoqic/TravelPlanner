@@ -3320,8 +3320,8 @@
                                                                             </div>
                                                                         </div>
                                                                         
-                                                                        {/* [MODIFIED] 右側按鈕欄：加寬至 w-16 並增加間距 gap-4，將導航與展開按鈕分開 */}
-                                                                        <div className="w-16 flex items-center justify-center gap-4 bg-black/5 hover:bg-black/10 transition-colors">
+                                                                        {/* [MODIFIED] 右側按鈕欄：移除預設背景 bg-black/5，改為透明，解決色差問題 */}
+                                                                        <div className="w-16 flex items-center justify-center gap-4 hover:bg-black/5 transition-colors">
                                                                             {!isExpense && <button onClick={(e) => {e.stopPropagation(); openGoogleMaps(act.title);}} className="text-gray-400 hover:text-[#0ABAB5] flex items-center justify-center p-1"><Navigation size={12} /></button>}
                                                                             <ChevronDown size={16} className={`text-gray-400 transition ${isExpanded?'rotate-180':''}`}/>
                                                                         </div>
