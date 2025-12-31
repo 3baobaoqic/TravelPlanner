@@ -1298,14 +1298,16 @@
                                 <div className="flex justify-between mb-2"><span className="text-xs font-bold text-gray-400">費用與記帳</span></div>
                                 <div className="flex gap-2 mb-2 items-start">
                                     <div className="flex-1 flex flex-col gap-2">
-                                        {/* Cost Input */}
-                                        <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee] h-[38px]">
+                                        {/* Cost Input - Wrapped for styling match */}
+                                        {/* [MODIFIED] 高度從 38px 調整為 42px 以配合右側 */}
+                                        <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee] h-[42px]">
                                             <span className="text-xs text-gray-400">$</span>
                                             <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} placeholder="金額" className="w-full bg-transparent p-2 text-sm outline-none text-gray-700 placeholder-gray-400" />
                                         </div>
                                         
-                                        {/* Category */}
+                                        {/* Category - Fixed Display with Add Button */}
                                         <div>
+                                            {/* Header with fixed height to match Payer header */}
                                             <div className="flex justify-between items-center mb-1 h-[16px]">
                                                 <label className="text-[10px] text-gray-400 font-bold">分類</label>
                                                 <button onClick={() => setIsAddingCat(!isAddingCat)} className="text-[10px] text-[#6A8E83] hover:text-[#557269] flex items-center gap-1 font-bold">
@@ -1314,8 +1316,43 @@
                                             </div>
                                             {isAddingCat ? (
                                                 <div className="flex gap-1 h-[34px]">
-                                                    <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="新分類" className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee] outline-none focus:ring-1 focus:ring-[#6A8E83]" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newCatName.trim()) { const currentCats = tripData.expenseCategories || []; if (!currentCats.includes(newCatName.trim())) { onUpdateCategories([...currentCats, newCatName.trim()]); setFormData({ ...formData, category: newCatName.trim() }); } setNewCatName(""); setIsAddingCat(false); } } }} />
-                                                    <button onClick={() => { if (newCatName.trim()) { const currentCats = tripData.expenseCategories || []; if (!currentCats.includes(newCatName.trim())) { onUpdateCategories([...currentCats, newCatName.trim()]); setFormData({ ...formData, category: newCatName.trim() }); } setNewCatName(""); setIsAddingCat(false); } }} className="bg-[#6A8E83] text-white px-2 rounded-lg text-xs"><Check size={14} /></button>
+                                                    <input 
+                                                        value={newCatName}
+                                                        onChange={e => setNewCatName(e.target.value)}
+                                                        placeholder="新分類"
+                                                        className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee] outline-none focus:ring-1 focus:ring-[#6A8E83]"
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                if (newCatName.trim()) {
+                                                                    const currentCats = tripData.expenseCategories || [];
+                                                                    if (!currentCats.includes(newCatName.trim())) {
+                                                                        onUpdateCategories([...currentCats, newCatName.trim()]);
+                                                                        setFormData({ ...formData, category: newCatName.trim() });
+                                                                    }
+                                                                    setNewCatName("");
+                                                                    setIsAddingCat(false);
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button 
+                                                        onClick={() => {
+                                                            if (newCatName.trim()) {
+                                                                const currentCats = tripData.expenseCategories || [];
+                                                                if (!currentCats.includes(newCatName.trim())) {
+                                                                    onUpdateCategories([...currentCats, newCatName.trim()]);
+                                                                    setFormData({ ...formData, category: newCatName.trim() });
+                                                                }
+                                                                setNewCatName("");
+                                                                setIsAddingCat(false);
+                                                            }
+                                                        }}
+                                                        className="bg-[#6A8E83] text-white px-2 rounded-lg text-xs"
+                                                    >
+                                                        <Check size={14} />
+                                                    </button>
                                                 </div>
                                             ) : (
                                                 <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
@@ -1324,18 +1361,16 @@
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Right Column: Payment Method & Currency, Payer */}
                                     <div className="w-[35%] flex flex-col gap-2">
                                         
-                                        {/* [MODIFIED] Payment Method & Currency Row */}
-                                        <div className="flex gap-1 h-[38px]">
+                                        {/* [MODIFIED] Payment Method & Currency Row - Updated to match ExpenseModal style */}
+                                        <div className="flex gap-1 h-[42px]">
                                             {/* Payment Method (Cash/Card) */}
-                                            <div className="flex-1 bg-[#E2E2E2] rounded-xl px-0 border border-[#eeeeee] flex items-center justify-center">
+                                            <div className="flex-1 bg-[#E2E2E2] rounded-xl px-0 border border-[#eeeeee] flex flex-col justify-center">
+                                                <label className="text-[9px] text-gray-400 font-bold text-center -mt-1">支付</label>
                                                 <select 
                                                     value={formData.paymentMethod} 
                                                     onChange={e=>setFormData({...formData, paymentMethod:e.target.value})} 
-                                                    // [MODIFIED] 將文字大小從 text-[10px] 加大為 text-sm
                                                     className="w-full bg-transparent p-0 text-sm font-bold text-gray-700 outline-none border-none text-center appearance-none"
                                                 >
                                                     <option value="cash">現金</option>
@@ -1344,20 +1379,24 @@
                                             </div>
 
                                             {/* Currency (Reduced width) */}
-                                            <div className="w-[45%] bg-[#E2E2E2] rounded-xl px-0 border border-[#eeeeee] flex items-center justify-center">
+                                            <div className="w-[45%] bg-[#E2E2E2] rounded-xl px-0 border border-[#eeeeee] flex flex-col justify-center">
+                                                <label className="text-[9px] text-gray-400 font-bold text-center -mt-1">幣別</label>
                                                 <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-transparent p-0 text-sm font-bold text-gray-700 outline-none border-none text-center appearance-none">
                                                     {currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}
                                                 </select>
                                             </div>
                                         </div>
                                         
-                                        {/* Payer */}
+                                        {/* Payer - Fixed Display */}
                                         <div>
                                             <div className="flex justify-between items-center mb-1 h-[16px]">
                                                 <label className="text-[10px] text-gray-400 font-bold block">付款人</label>
                                             </div>
                                             <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 py-0 h-[34px] text-xs font-bold text-gray-700 border border-[#eeeeee]">
-                                                {tripData.members.map(m => ( m ? <option key={m.name} value={m.name}>{m.name}</option> : null ))}
+                                                {tripData.members.map(m => (
+                                                    // FIX: Guard clause to prevent crash if member is null
+                                                    m ? <option key={m.name} value={m.name}>{m.name}</option> : null
+                                                ))}
                                             </select>
                                         </div>
                                     </div>
