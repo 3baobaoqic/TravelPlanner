@@ -1335,7 +1335,8 @@
                                                 <select 
                                                     value={formData.paymentMethod} 
                                                     onChange={e=>setFormData({...formData, paymentMethod:e.target.value})} 
-                                                    className="w-full bg-transparent p-0 text-[10px] font-bold text-gray-700 outline-none border-none text-center appearance-none"
+                                                    // [MODIFIED] 將文字大小從 text-[10px] 加大為 text-sm
+                                                    className="w-full bg-transparent p-0 text-sm font-bold text-gray-700 outline-none border-none text-center appearance-none"
                                                 >
                                                     <option value="cash">現金</option>
                                                     <option value="card">信用卡</option>
@@ -1388,9 +1389,13 @@
 
         // [FIX] 補回遺失的 ExpenseModal 元件
         const ExpenseModal = ({ isOpen, onClose, onSave, onUpdateCategories, selectedDate, currentMember, defaultValues, tripData }) => {
-            const [formData, setFormData] = useState({ date: selectedDate, time: '', cost: '', title: '', payer: '', currency: '', category: '', photoUrls: [], note: '' });
-            const [isManage, setIsManage] = useState(false);
-            const [newCat, setNewCat] = useState('');
+            // [MODIFIED] 新增 paymentMethod 狀態
+            const [formData, setFormData] = useState({ date: selectedDate, time: '', cost: '', title: '', payer: '', currency: '', paymentMethod: 'cash', category: '', photoUrls: [], note: '' });
+            
+            // [MODIFIED] 改用 isAddingCat 模式來管理分類新增 (與新增行程一致)
+            const [isAddingCat, setIsAddingCat] = useState(false);
+            const [newCatName, setNewCatName] = useState("");
+            
             const [confirm, setConfirm] = useState({ open: false, action: null, msg: '' });
             const fileRef = useRef(null);
             
@@ -1404,6 +1409,8 @@
                              title: defaultValues.title || '',
                              payer: defaultValues.payer || '',
                              currency: defaultValues.currency || '',
+                             // [MODIFIED] 載入 paymentMethod
+                             paymentMethod: defaultValues.paymentMethod || 'cash',
                              category: defaultValues.category || '',
                              photoUrls: defaultValues.photoUrls || [],
                              note: defaultValues.note || ''
@@ -1416,17 +1423,21 @@
                              title: '', 
                              payer: currentMember?.name || tripData?.members?.[0]?.name || '我', 
                              currency: tripData?.currency || 'JPY', 
+                             // [MODIFIED] 預設 paymentMethod
+                             paymentMethod: 'cash',
                              category: '餐飲', 
                              photoUrls: [],
                              note: ''
                          });
                      }
+                     // Reset UI states
+                     setIsAddingCat(false);
+                     setNewCatName("");
                  }
             }, [isOpen, tripData, currentMember, defaultValues, selectedDate]);
 
             if (!isOpen) return null;
             
-            // Modified: Use processImageUpload for unified logic
             const handleFile = async (e) => { 
                 const f = e.target.files[0]; 
                 if(f) { 
@@ -1442,31 +1453,112 @@
                     <div className="absolute inset-0 bg-black/20" onClick={onClose}></div>
                     <div className="bg-[#F5FDFC] w-[85%] sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden border border-[#eeeeee] relative z-10 flex flex-col max-h-[90vh]">
                         <div className="bg-[#D68C68] p-3 text-center text-white font-bold relative">{defaultValues ? '編輯記帳' : '新增記帳'}<button onClick={onClose} className="absolute right-3"><X size={20}/></button></div>
-                        {/* FIX: Added flex-1 to ensure correct scrolling behavior */}
                         <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                            <div className="flex items-end gap-2">
-                                <div className="w-[50%]"><label className="text-xs text-gray-400 font-bold block">金額</label><div className="relative"><DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl pl-7 p-2 text-xl font-bold text-gray-800 border border-[#eeeeee]" autoFocus /></div></div>
-                                <div className="w-[20%]"><label className="text-xs text-gray-400 font-bold block">幣別</label><select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">{currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}</select></div>
-                                <div className="w-[30%]"><label className="text-xs text-gray-400 font-bold block">付款人</label>
-                                    <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]">
+                            
+                            {/* Row 1: Date & Time */}
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-400 font-bold block mb-1">日期</label>
+                                    <input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
+                                </div>
+                                <div className="w-1/3">
+                                    <label className="text-xs text-gray-400 font-bold block mb-1">時間</label>
+                                    <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
+                                </div>
+                            </div>
+
+                            {/* Row 2: Title */}
+                            <div>
+                                <label className="text-xs text-gray-400 font-bold block mb-1">名稱</label>
+                                <input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee]" placeholder="消費項目名稱" />
+                            </div>
+
+                            {/* Row 3: Note */}
+                            <div>
+                                <label className="text-xs text-gray-400 font-bold block mb-1">備註</label>
+                                <textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={2} placeholder="備註..." className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee] resize-none" />
+                            </div>
+
+                            {/* Row 4: Cost | Payment | Currency */}
+                            <div className="flex gap-2 items-end">
+                                {/* Left: Cost Input */}
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-400 font-bold block mb-1">金額</label>
+                                    <div className="flex items-center bg-[#E2E2E2] rounded-xl px-2 border border-[#eeeeee] h-[42px]">
+                                        <DollarSign className="text-gray-400 mr-1" size={16} />
+                                        <input type="number" value={formData.cost} onChange={e=>setFormData({...formData, cost:e.target.value})} className="w-full bg-transparent p-2 text-xl font-bold text-gray-800 outline-none placeholder-gray-400" placeholder="0" autoFocus />
+                                    </div>
+                                </div>
+
+                                {/* Right: Payment & Currency (Width ratio matches ActivityModal: 35%) */}
+                                <div className="w-[35%] flex gap-1 h-[42px]">
+                                    {/* Payment Method */}
+                                    <div className="flex-1 bg-[#E2E2E2] rounded-xl px-0 border border-[#eeeeee] flex flex-col justify-center">
+                                        <label className="text-[9px] text-gray-400 font-bold text-center -mt-1">支付</label>
+                                        <select 
+                                            value={formData.paymentMethod} 
+                                            onChange={e=>setFormData({...formData, paymentMethod:e.target.value})} 
+                                            className="w-full bg-transparent p-0 text-sm font-bold text-gray-700 outline-none border-none text-center appearance-none"
+                                        >
+                                            <option value="cash">現金</option>
+                                            <option value="card">信用卡</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Currency (Width 45%) */}
+                                    <div className="w-[45%] bg-[#E2E2E2] rounded-xl px-0 border border-[#eeeeee] flex flex-col justify-center">
+                                        <label className="text-[9px] text-gray-400 font-bold text-center -mt-1">幣別</label>
+                                        <select value={formData.currency} onChange={e=>setFormData({...formData, currency:e.target.value})} className="w-full bg-transparent p-0 text-sm font-bold text-gray-700 outline-none border-none text-center appearance-none">
+                                            {currencies.map(c=><option key={c.value} value={c.value}>{c.value}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Row 5: Category | Payer */}
+                            <div className="flex gap-2">
+                                {/* Category Dropdown */}
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs text-gray-400 font-bold">分類</label>
+                                        <button onClick={() => setIsAddingCat(!isAddingCat)} className="text-[10px] text-[#D68C68] hover:text-[#b57b5c] flex items-center gap-1 font-bold">
+                                            {isAddingCat ? '取消' : '+ 新增'}
+                                        </button>
+                                    </div>
+                                    
+                                    {isAddingCat ? (
+                                        <div className="flex gap-1 h-[42px]">
+                                            <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="新分類" className="w-full bg-[#E2E2E2] rounded-xl p-2 text-xs text-gray-700 border border-[#eeeeee] outline-none focus:ring-1 focus:ring-[#D68C68]" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newCatName.trim()) { const currentCats = tripData.expenseCategories || []; if (!currentCats.includes(newCatName.trim())) { onUpdateCategories([...currentCats, newCatName.trim()]); setFormData({ ...formData, category: newCatName.trim() }); } setNewCatName(""); setIsAddingCat(false); } } }} />
+                                            <button onClick={() => { if (newCatName.trim()) { const currentCats = tripData.expenseCategories || []; if (!currentCats.includes(newCatName.trim())) { onUpdateCategories([...currentCats, newCatName.trim()]); setFormData({ ...formData, category: newCatName.trim() }); } setNewCatName(""); setIsAddingCat(false); } }} className="bg-[#D68C68] text-white px-2 rounded-lg text-xs"><Check size={14} /></button>
+                                        </div>
+                                    ) : (
+                                        <select value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 h-[42px] text-sm font-bold text-gray-700 border border-[#eeeeee]">
+                                            {(tripData.expenseCategories||[]).map(c=><option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    )}
+                                </div>
+
+                                {/* Payer Dropdown */}
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-400 font-bold block mb-1">付款人</label>
+                                    <select value={formData.payer} onChange={e=>setFormData({...formData, payer:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl px-2 h-[42px] text-sm font-bold text-gray-700 border border-[#eeeeee]">
                                         {tripData.members.map(m => (
-                                            // FIX: Guard clause to prevent crash if member is null
                                             m ? <option key={m.name} value={m.name}>{m.name}</option> : null
                                         ))}
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Row 6: Photos */}
                             <div>
-                                <div className="flex justify-between items-center mb-2"><label className="text-xs text-gray-400 font-bold">分類</label><button onClick={()=>setIsManage(!isManage)} className="text-xs text-[#D68C68] flex items-center gap-1 font-bold"><Settings size={12}/>管理</button></div>
-                                {isManage ? <div className="bg-[#E2E2E2] p-2 rounded-xl mb-2 border border-[#eeeeee]"><div className="flex flex-wrap gap-1 mb-2">{(tripData.expenseCategories||[]).map(c=><span key={c} className="bg-white px-2 py-1 rounded text-[10px] flex items-center gap-1 border border-[#eeeeee]">{c}<button onClick={()=>setConfirm({open:true, msg:`刪除 ${c}?`, action:()=>onUpdateCategories((tripData.expenseCategories||[]).filter(x=>x!==c))})}><X size={10}/></button></span>)}</div><div className="flex gap-1"><input value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="新分類" className="flex-1 p-1 text-xs rounded text-gray-700 border border-[#eeeeee]" /><button onClick={()=>{if(newCat){onUpdateCategories([...(tripData.expenseCategories||[]), newCat]); setNewCat('');}}} className="bg-green-500 text-white p-1 rounded border border-green-500"><Plus size={14}/></button></div></div> : <div className="flex flex-wrap gap-1.5">{(tripData.expenseCategories||[]).map(c=><button key={c} onClick={()=>setFormData({...formData, category:c})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${formData.category===c?'bg-[#D68C68] text-white border-[#D68C68]':'bg-[#E2E2E2] text-gray-600 border-[#eeeeee]'}`}>{c}</button>)}</div>}
+                                <label className="text-xs text-gray-400 font-bold block mb-2">照片</label>
+                                <div className="flex gap-2 overflow-x-auto">
+                                    {formData.photoUrls?.map((url, i)=><div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...formData.photoUrls]; n.splice(i,1); setFormData({...formData, photoUrls:n})}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>)}
+                                    <button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16}/></button>
+                                    <input type="file" ref={fileRef} className="hidden" onChange={handleFile} />
+                                </div>
                             </div>
-                            <div className="flex gap-2">
-                                <input type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="flex-1 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
-                                <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-1/3 bg-[#E2E2E2] rounded-xl p-2 text-sm font-bold text-gray-700 border border-[#eeeeee]" />
-                            </div>
-                            <div><label className="text-xs text-gray-400 font-bold block">名稱</label><input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee]" /></div>
-                            <div><label className="text-xs text-gray-400 font-bold block">備註</label><textarea value={formData.note} onChange={e=>setFormData({...formData, note:e.target.value})} rows={1} placeholder="備註..." className="w-full bg-[#E2E2E2] rounded-xl p-3 text-sm font-bold text-gray-700 border border-[#eeeeee] resize-none" /></div>
-                            <div><label className="text-xs text-gray-400 font-bold block">照片</label><div className="flex gap-2 overflow-x-auto">{formData.photoUrls?.map((url, i)=><div key={i} className="relative w-10 h-10 flex-shrink-0"><img src={url} className="w-full h-full object-cover rounded-lg" /><button onClick={()=>setConfirm({open:true, msg:'刪除照片?', action:()=>{const n=[...formData.photoUrls]; n.splice(i,1); setFormData({...formData, photoUrls:n})}})} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8}/></button></div>)}<button onClick={()=>fileRef.current.click()} className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center"><Camera size={16}/></button><input type="file" ref={fileRef} className="hidden" onChange={handleFile} /></div></div>
+                            
                             <button onClick={()=>{if(parseFloat(formData.cost)>0) { onSave(formData); }}} disabled={!formData.cost} className="w-full py-3 bg-[#D68C68] text-white rounded-xl font-bold shadow-md border border-[#D68C68]">{defaultValues ? '儲存變更' : '儲存'}</button>
                         </div>
                     </div>
