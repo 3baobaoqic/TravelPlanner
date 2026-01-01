@@ -2457,6 +2457,8 @@
                 
                 const newItinerary = { ...tripData.itinerary };
 
+                let targetList = newItinerary[targetDate] || [];
+
                 if (editingActivity) {
                     // Update Mode
                     if (oldDate !== targetDate) {
@@ -2464,25 +2466,23 @@
                         if (newItinerary[oldDate]) {
                             newItinerary[oldDate] = newItinerary[oldDate].filter(a => a.id !== activityId);
                         }
+                        // targetList is already the original list for targetDate, which is correct
                     } else {
-                        // 2. Simple update on the same day (remove old, add new to ensure proper re-sort)
-                        newItinerary[targetDate] = (newItinerary[targetDate] || []).filter(a => a.id !== activityId);
+                        // 2. Simple update on the same day -> Filter out the OLD item first
+                        targetList = targetList.filter(a => a.id !== activityId);
                     }
-                } else if (newItinerary[oldDate]) { // Non-editing, check if exists on selected date
-                     // If adding a new activity, simply push to the targetDate. The filtering in the else block above is not strictly necessary for CREATE, but we keep the targetDate handling logic here.
-                }
+                } 
 
-                // 3. Add or update on the target date
-                if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
-                // Re-filter before push in case of non-editing mode to ensure uniqueness for current operation
-                if (!editingActivity) {
-                    newItinerary[targetDate] = newItinerary[targetDate].filter(a => a.id !== activityId);
-                }
-                newItinerary[targetDate].push({
-                    id: activityId,
-                    ...activityData,
-                    createdBy: activityCreator
-                });
+                // 3. Add new/updated item to the list
+                // [FIX] Use spread syntax to ensure new array reference, forcing chart re-render
+                newItinerary[targetDate] = [
+                    ...targetList,
+                    {
+                        id: activityId,
+                        ...activityData,
+                        createdBy: activityCreator
+                    }
+                ];
                 
                 // If the selectedDate remains valid after saving, set it to target date if it changed
                 if (selectedDate !== targetDate) {
@@ -3198,7 +3198,7 @@
                         barData
                     };
                 }).filter(Boolean); // Remove nulls
-            }, [tripData, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode, drillDownCategory]); // Added drillDownCategory dependency
+            }, [tripData, tripData.itinerary, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode, drillDownCategory]); // [FIX] Added tripData.itinerary dependency explicitly
 
             const sortedExpensesByDate = useMemo(() => {
                 if (!tripData) return [];
