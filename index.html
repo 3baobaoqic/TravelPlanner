@@ -2514,20 +2514,32 @@
                     }
                     
                     // 2. Add to new date (keep original ID and creator)
-                    if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
-                    newItinerary[targetDate].push({
-                        ...expenseData,
-                        id: editingExpense.id,
-                        createdBy: editingExpense.createdBy
-                    });
+                    // [FIX] Use spread syntax instead of push to avoid state mutation
+                    const currentList = newItinerary[targetDate] || [];
+                    // Note: If oldDate == targetDate, currentList is already filtered above (as newItinerary[oldDate] IS newItinerary[targetDate])
+                    // But to be safe and consistent with strict immutability:
+                    const listToAdd = (oldDate === targetDate) ? currentList : (newItinerary[targetDate] || []);
+                    
+                    newItinerary[targetDate] = [
+                        ...listToAdd,
+                        {
+                            ...expenseData,
+                            id: editingExpense.id,
+                            createdBy: editingExpense.createdBy
+                        }
+                    ];
                 } else {
                     // Create Mode
-                    if (!newItinerary[targetDate]) newItinerary[targetDate] = [];
-                    newItinerary[targetDate].push({
-                        id: generateId(),
-                        ...expenseData,
-                        createdBy: currentMember.name
-                    });
+                    // [FIX] Use spread syntax instead of push to avoid state mutation
+                    const currentList = newItinerary[targetDate] || [];
+                    newItinerary[targetDate] = [
+                        ...currentList,
+                        {
+                            id: generateId(),
+                            ...expenseData,
+                            createdBy: currentMember.name
+                        }
+                    ];
                 }
 
                 updateTrip('itinerary', newItinerary);
