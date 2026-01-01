@@ -3198,7 +3198,8 @@
                         barData
                     };
                 }).filter(Boolean); // Remove nulls
-            }, [tripData, tripData.itinerary, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode, drillDownCategory]); // [FIX] Added tripData.itinerary dependency explicitly
+            // [FIX] 修正依賴列表崩潰問題：使用 tripData?.itinerary 避免初始 null 存取錯誤
+            }, [tripData, tripData?.itinerary, expenseFilterDate, expenseFilterPayer, expenseFilterCurrency, expenseViewMode, drillDownCategory]); 
 
             const sortedExpensesByDate = useMemo(() => {
                 if (!tripData) return [];
