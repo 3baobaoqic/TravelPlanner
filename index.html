@@ -287,7 +287,8 @@
                     if (imgbbKey.trim()) {
                         try {
                             const formData = new FormData();
-                            formData.append('image', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+                            // 改用有效的 1x1 紅色 PNG Base64，避免被圖床安全機制當作惡意追蹤像素阻擋
+                            formData.append('image', 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
                             
                             const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey.trim()}`, {
                                 method: 'POST',
