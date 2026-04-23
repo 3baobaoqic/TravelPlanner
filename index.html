@@ -287,35 +287,11 @@
                     await signInAnonymously(tempAuth);
                     await deleteApp(tempApp);
                     
-                    let imgbbVerified = false;
-                    let imgbbWarning = '';
-                    if (imgbbKey.trim()) {
-                        try {
-                            const formData = new FormData();
-                            formData.append('image', 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-                            
-                            const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey.trim()}`, {
-                                method: 'POST',
-                                body: formData
-                            });
-                            
-                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                            const data = await res.json();
-                            
-                            if (!data.success) {
-                                throw new Error(data.error?.message || 'Invalid API Key');
-                            }
-                            imgbbVerified = true;
-                        } catch (imgError) {
-                            console.warn("Imgbb 測試被阻擋，已改為軟性放行:", imgError);
-                            imgbbWarning = ' (圖床被防火牆阻擋，但已放行進入系統)';
-                        }
-                    }
-
+                    // [MODIFIED] 移除 Imgbb 的實際發送測試，僅進行 Firebase 測試並直接儲存 Key
                     localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
                     localStorage.setItem('gtp_imgbb_key', imgbbKey.trim());
                     
-                    setSuccessMessage('Firebase 連線成功' + imgbbWarning);
+                    setSuccessMessage('Firebase 連線成功' + (imgbbKey.trim() ? ' (已記錄 Imgbb Key)' : ''));
                     onConnect(config);
 
                 } catch (e) {
