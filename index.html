@@ -284,10 +284,12 @@
                     await deleteApp(tempApp);
                     
                     let imgbbVerified = false;
+                    let imgbbWarning = ''; // [NEW] 紀錄 Imgbb 警告訊息
                     if (imgbbKey.trim()) {
                         try {
                             const formData = new FormData();
-                            formData.append('image', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+                            // [MODIFIED] 改用標準的 1x1 透明 PNG Base64，避免舊版 GIF 被 Imgbb 視為無效圖片而阻擋
+                            formData.append('image', 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
                             
                             const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey.trim()}`, {
                                 method: 'POST',
@@ -300,14 +302,25 @@
                             }
                             imgbbVerified = true;
                         } catch (imgError) {
-                            setTestStatus('error');
-                            setErrorMessage(`Firebase 連線成功，但 Imgbb 連線失敗: ${imgError.message}`);
-                            return;
+                            // [MODIFIED] 不再直接 return 中斷程序，而是紀錄警告，讓 Firebase 先行通過
+                            imgbbWarning = `\n(備註: Imgbb 測試失敗 - ${imgError.message})`;
+                            console.warn("Imgbb 連線失敗:", imgError);
                         }
                     }
 
                     localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
-                    localStorage.setItem('gtp_imgbb_key', imgbbKey.trim());
+                    
+                    // [MODIFIED] 根據驗證結果決定是否儲存 Imgbb Key
+                    if (imgbbVerified) {
+                        localStorage.setItem('gtp_imgbb_key', imgbbKey.trim());
+                    } else if (!imgbbKey.trim()) {
+                        localStorage.removeItem('gtp_imgbb_key');
+                    }
+                    
+                    // 若有警告，跳出提示讓用戶知道
+                    if (imgbbWarning) {
+                        alert(`Firebase 連線成功！${imgbbWarning}\n\n您仍可繼續使用系統，但照片可能會受到容量限制。`);
+                    }
                     
                     onConnect(config);
 
