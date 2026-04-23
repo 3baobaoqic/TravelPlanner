@@ -197,13 +197,17 @@
                         return data.data.url;
                     } else {
                         console.error("Imgbb error:", data);
-                        alert("圖片上傳失敗，將使用本機儲存 (容量有限)。錯誤: " + (data.error?.message || 'Unknown'));
+                        alert("圖片上傳失敗，已取消上傳。錯誤: " + (data.error?.message || 'Unknown'));
+                        return null; // [MODIFIED] 取消退回 Base64，直接中止上傳
                     }
                 } catch (err) {
                     console.error("Imgbb fetch error:", err);
-                    alert("連線 Imgbb 失敗，將使用本機儲存。");
+                    alert("連線 Imgbb 失敗，已取消上傳。請檢查是否被「廣告攔截器」阻擋。");
+                    return null; // [MODIFIED] 取消退回 Base64，直接中止上傳
                 }
             }
+            
+            // 若完全未設定 API Key，維持原設計存入 Base64
             return b64;
         };
 
@@ -284,16 +288,18 @@
                     await deleteApp(tempApp);
                     
                     let imgbbVerified = false;
+                    let imgbbWarning = '';
                     if (imgbbKey.trim()) {
                         try {
                             const formData = new FormData();
-                            // 改用有效的 1x1 紅色 PNG Base64，避免被圖床安全機制當作惡意追蹤像素阻擋
                             formData.append('image', 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
                             
                             const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey.trim()}`, {
                                 method: 'POST',
                                 body: formData
                             });
+                            
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
                             const data = await res.json();
                             
                             if (!data.success) {
@@ -301,15 +307,15 @@
                             }
                             imgbbVerified = true;
                         } catch (imgError) {
-                            setTestStatus('error');
-                            setErrorMessage(`Firebase 連線成功，但 Imgbb 連線失敗: ${imgError.message}`);
-                            return;
+                            console.warn("Imgbb 測試被阻擋，已改為軟性放行:", imgError);
+                            imgbbWarning = ' (圖床被防火牆阻擋，但已放行進入系統)';
                         }
                     }
 
                     localStorage.setItem('gtp_firebase_config', JSON.stringify(config));
                     localStorage.setItem('gtp_imgbb_key', imgbbKey.trim());
                     
+                    setSuccessMessage('Firebase 連線成功' + imgbbWarning);
                     onConnect(config);
 
                 } catch (e) {
@@ -597,7 +603,7 @@
                             <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
                         </div>
                         <div className="p-2 bg-yellow-50 rounded mb-2 text-xs text-yellow-600 border border-yellow-100">
-                           可修改自己的暱稱與 PIN 碼 (供登入驗證用)。
+                            可修改自己的暱稱與 PIN 碼 (供登入驗證用)。
                         </div>
 
                         <div className="space-y-3 overflow-y-auto p-1 mb-4 custom-scrollbar">
@@ -2549,7 +2555,7 @@
                 
                 // 4. Auto-switch date if needed
                 if (selectedDate !== targetDate) {
-                   setSelectedDate(targetDate);
+                    setSelectedDate(targetDate);
                 }
 
                 updateTrip('itinerary', newItinerary);
@@ -3370,13 +3376,13 @@
                                                                 const imgbbKeyStr = localStorage.getItem('gtp_imgbb_key');
                                                                 if (fbConfigStr) {
                                                                     try {
-                                                                            const bundle = {
-                                                                                id: tripData.id,
-                                                                                firebase: JSON.parse(fbConfigStr),
-                                                                                imgbb: imgbbKeyStr || ''
-                                                                            };
-                                                                            textToCopy = JSON.stringify(bundle);
-                                                                            alertMsg = "已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。";
+                                                                        const bundle = {
+                                                                            id: tripData.id,
+                                                                            firebase: JSON.parse(fbConfigStr),
+                                                                            imgbb: imgbbKeyStr || ''
+                                                                        };
+                                                                        textToCopy = JSON.stringify(bundle);
+                                                                        alertMsg = "已複製「一鍵設定懶人包」！\n\n朋友只需在首頁貼上這串代碼，即可自動設定連線並加入旅程。";
                                                                     } catch (e) {
                                                                         console.error("Bundle error", e);
                                                                     }
@@ -3583,7 +3589,8 @@
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            )})}
+                                                                );
+                                                            })}
                                                         </div>
                                                         <AccommodationCard 
                                                             date={selectedDate} 
@@ -3745,8 +3752,8 @@
                                                                             data={stat.pieData} 
                                                                             onSliceClick={
                                                                                 drillDownCategory 
-                                                                                    ? () => setDrillDownCategory(null) 
-                                                                                    : (expenseViewMode === 'category' ? (cat) => setDrillDownCategory(cat) : null)
+                                                                                ? () => setDrillDownCategory(null) 
+                                                                                : (expenseViewMode === 'category' ? (cat) => setDrillDownCategory(cat) : null)
                                                                             }
                                                                         />
                                                                         
@@ -3880,7 +3887,7 @@
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
-                                                                                );
+                                                                                    );
                                                                                 })}
                                                                             </div>
                                                                         </div>
@@ -3891,38 +3898,6 @@
                                                     </div>
                                                 )}
                                             </div>
-
-                                            <ActivityModal isOpen={modals.activity} onClose={() => { setModals({...modals, activity:false}); setEditingActivity(null); }} onSave={handleSaveActivity} tripData={tripData} defaultValues={editingActivity} currentMember={currentMember} selectedDate={selectedDate} onUpdateCategories={c=>updateTrip('expenseCategories',c)} />
-                                            <ExpenseModal 
-                                                isOpen={modals.expense} 
-                                                onClose={()=> { setModals({...modals, expense:false}); setEditingExpense(null); }} 
-                                                tripData={tripData} 
-                                                onSave={handleSaveExpense} 
-                                                onUpdateCategories={c=>updateTrip('expenseCategories',c)} 
-                                                selectedDate={selectedDate} 
-                                                currentMember={currentMember}
-                                                defaultValues={editingExpense}
-                                            />
-                                            {modals.transaction && (
-                                                <TransactionDetailModal 
-                                                    transaction={modals.transaction} 
-                                                    onClose={() => setModals({ ...modals, transaction: null })} 
-                                                    onViewImage={(url) => setModals({ ...modals, viewingImage: url })} 
-                                                />
-                                            )}
-                                            <ImageModal src={modals.viewingImage} onClose={()=>setModals({...modals, viewingImage:null})} />
-                                            {modals.editTrip && <EditTripModal isOpen={modals.editTrip} onClose={() => setModals({ ...modals, editTrip: false })} tripData={tripData} onSave={handleEditTripSave} />}
-                                            <JoinModal isOpen={modals.join} onClose={() => setModals(m => ({...m, join: false}))} tripData={tripData} onJoin={handleJoinTrip} />
-                                            <MemberManagementModal 
-                                                isOpen={modals.members} 
-                                                onClose={() => setModals({ ...modals, members: false })} 
-                                                tripData={tripData} 
-                                                currentMember={currentMember} 
-                                                onUpdateMember={handleUpdateMember} 
-                                                onRemoveMember={handleRemoveMember}
-                                                onAddMember={handleAddMember}
-                                            />
-                                            <input type="file" ref={fileRef} className="hidden" onChange={handlePhotoUpload} accept="image/*" />
                                         </>
                                         )
                                     )}
